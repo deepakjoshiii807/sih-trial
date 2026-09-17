@@ -24,6 +24,10 @@ APP_DIR="${APP_DIR:-$HOME/sih-trial}"
 CERT_EMAIL="${CERT_EMAIL:-}"
 FIREBASE_PROJECT_ID="${FIREBASE_PROJECT_ID:-learntoleadd}"
 FRONTEND_ORIGINS="${FRONTEND_ORIGINS:-https://5173-a68b6e90-f41e-4a15-bb41-f4e2999832a5.daytonaproxy01.net}"
+# Optional: the AI gateway base URL. Leave blank to use the built-in default
+# (https://integrations.vly.ai/v1/llm) — set it if your key belongs to a
+# different gateway (the project docs mention https://integrations.freebuff.com).
+VLY_INTEGRATION_BASE_URL="${VLY_INTEGRATION_BASE_URL:-}"
 
 log()  { printf '\n\033[1;32m==> %s\033[0m\n' "$*"; }
 warn() { printf '\033[1;33m!! %s\033[0m\n' "$*" >&2; }
@@ -118,6 +122,9 @@ else
   prompt_secret POSTGRES_PASSWORD      "New Postgres password"
   prompt_secret DEMO_PASSWORD          "Demo seed password"
   prompt_secret VLY_INTEGRATION_KEY    "VLY_INTEGRATION_KEY (from the project's Keys tab)"
+  if [ -z "$VLY_INTEGRATION_BASE_URL" ]; then
+    read -rp "    AI gateway base URL (Enter to use the built-in default): " VLY_INTEGRATION_BASE_URL </dev/tty
+  fi
   if [ -z "$CERT_EMAIL" ]; then
     read -rp "    Let's Encrypt contact email: " CERT_EMAIL </dev/tty
   fi
@@ -148,6 +155,9 @@ WEB_CONCURRENCY=2
 WEB_THREADS=2
 EOF
   )
+  if [ -n "$VLY_INTEGRATION_BASE_URL" ]; then
+    printf 'VLY_INTEGRATION_BASE_URL=%s\n' "$VLY_INTEGRATION_BASE_URL" >> .env
+  fi
   chmod 600 .env
 fi
 
@@ -173,7 +183,76 @@ fi
 echo "    $(curl -fsS http://127.0.0.1:8000/api/health)"
 
 # --------------------------------------------------------------------------
-# 6. nginx — HTTP first so the ACME challenge can be served
+# 6. Build the React frontend and deploy to nginx
+# --------------------------------------------------------------------------
+log "Building the React frontend"
+
+# Node.js 20 — needed by Vite
+if ! command -v node >/dev/null 2>&1; then
+  log "Installing Node.js 20"
+  sudo dnf install -y nodejs:20 || sudo dnf module install -y nodejs:20/default
+fi
+node --version
+
+# Bun — the project's package manager
+if ! command -v bun >/dev/null 2>&1; then
+  log "Installing Bun"
+  curl -fsSL https://bun.sh/install | bash
+  export PATH="$HOME/.bun/bin:$PATH"
+fi
+bun --version
+
+# Prompt for Firebase web config values (needed at build time for VITE_* vars)
+if [ -z "${VITE_FIREBASE_API_KEY:-}" ]; then
+  echo ""
+  log "Firebase web config (from Firebase Console -> Project Settings -> General)"
+  [ -n "${VITE_FIREBASE_API_KEY:-}" ]      || prompt_secret VITE_FIREBASE_API_KEY             "VITE_FIREBASE_API_KEY"
+  [ -n "${VITE_FIREBASE_AUTH_DOMAIN:-}" ]  || prompt_secret VITE_FIREBASE_AUTH_DOMAIN          "VITE_FIREBASE_AUTH_DOMAIN"
+  [ -n "${VITE_FIREBASE_PROJECT_ID:-}" ]   || prompt_secret VITE_FIREBASE_PROJECT_ID           "VITE_FIREBASE_PROJECT_ID"
+  [ -n "${VITE_FIREBASE_STORAGE_BUCKET:-}" ] || prompt_secret VITE_FIREBASE_STORAGE_BUCKET     "VITE_FIREBASE_STORAGE_BUCKET"
+  [ -n "${VITE_FIREBASE_MESSAGING_SENDER_ID:-}" ] || prompt_secret VITE_FIREBASE_MESSAGING_SENDER_ID "VITE_FIREBASE_MESSAGING_SENDER_ID"
+  [ -n "${VITE_FIREBASE_APP_ID:-}" ]       || prompt_secret VITE_FIREBASE_APP_ID               "VITE_FIREBASE_APP_ID"
+fi
+
+# Write .env.production at the repo root for Vite (same-origin /api base URL)
+log "Writing frontend .env.production"
+cd "$APP_DIR"
+cat > .env.production <<FEOF
+VITE_API_URL=https://$HOST/api
+VITE_FIREBASE_API_KEY=$VITE_FIREBASE_API_KEY
+VITE_FIREBASE_AUTH_DOMAIN=$VITE_FIREBASE_AUTH_DOMAIN
+VITE_FIREBASE_PROJECT_ID=$VITE_FIREBASE_PROJECT_ID
+VITE_FIREBASE_STORAGE_BUCKET=$VITE_FIREBASE_STORAGE_BUCKET
+VITE_FIREBASE_MESSAGING_SENDER_ID=$VITE_FIREBASE_MESSAGING_SENDER_ID
+VITE_FIREBASE_APP_ID=$VITE_FIREBASE_APP_ID
+FEOF
+chmod 600 .env.production
+
+log "Installing frontend dependencies"
+bun install --frozen-lockfile 2>/dev/null || bun install
+
+log "Running vite build"
+bun run build
+[ -d dist ] || die "Frontend build failed — dist/ not found."
+echo "    dist/ size: $(du -sh dist | cut -f1)"
+
+log "Deploying frontend to /var/www/app/dist"
+sudo mkdir -p /var/www/app
+cd "$APP_DIR/backend"  # back to backend dir for remaining steps
+
+# Use rsync if available, fall back to cp
+if command -v rsync >/dev/null 2>&1; then
+  sudo rsync -a --delete "$APP_DIR/dist/" /var/www/app/dist/
+else
+  sudo rm -rf /var/www/app/dist
+  sudo cp -r "$APP_DIR/dist" /var/www/app/dist
+fi
+echo "    Deployed $(find /var/www/app/dist -type f | wc -l) files to /var/www/app/dist"
+
+cd "$APP_DIR/backend"
+
+# --------------------------------------------------------------------------
+# 7. nginx — HTTP first so the ACME challenge can be served
 # --------------------------------------------------------------------------
 log "Installing the nginx site config"
 sudo sed "s/__API_HOST__/$HOST/g" deploy/nginx/l2l-api-http.conf \
@@ -220,23 +299,23 @@ cat <<EOF
 
 $(printf '\033[1;32m')Deployment complete.$(printf '\033[0m')
 
+    Frontend      https://$HOST/   (React SPA)
     API           https://$HOST/api
     Health        https://$HOST/api/health
     Admin         https://$HOST/admin/
 
-Next, in the project environment (both sandbox and production):
+Both the frontend and backend are served from the same domain.
+React Router paths (/student, /industry, etc.) work via nginx SPA fallback.
 
-    VITE_API_URL=https://$HOST/api
-
-The frontend must then be REDEPLOYED — Vite inlines env vars at build time, so
-the value does nothing until it rebuilds.
-
-Also add your deployed frontend's domain to Firebase:
+Also add this domain to Firebase:
     Authentication -> Settings -> Authorized domains
 (Google sign-in refuses origins that are not listed; email/password does not.)
 
-Ops:
+To redeploy after code changes:
     cd $APP_DIR/backend
+    bash deploy/bootstrap-al2023.sh     # idempotent — pulls latest, rebuilds
+
+Ops:
     sudo docker compose -f docker-compose.yml -f docker-compose.prod.yml logs -f web
     sudo docker compose exec web python manage.py createsuperuser
     sudo docker compose exec -T db pg_dump -U skillbridge skillbridge > ~/backup-\$(date +%F).sql

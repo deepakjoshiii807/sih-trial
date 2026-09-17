@@ -142,6 +142,10 @@ FIREBASE_PROJECT_ID=learntoleadd
 
 # ---- AI gateway key — copy from the project's Keys tab --------------------
 VLY_INTEGRATION_KEY=<paste-from-keys-tab>
+# Optional, but set it if the Keys tab shows one. apps/api/ai.py prefers this
+# variable and otherwise falls back to https://integrations.vly.ai/v1/llm, which
+# may not be the gateway your key belongs to (docs mention integrations.freebuff.com).
+#VLY_INTEGRATION_BASE_URL=https://integrations.freebuff.com
 
 # ---- gunicorn -------------------------------------------------------------
 WEB_CONCURRENCY=2

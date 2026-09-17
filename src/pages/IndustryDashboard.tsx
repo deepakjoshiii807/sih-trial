@@ -10,68 +10,30 @@ import {
   Zap, Shield, Award, Plus, Pause, Play, XCircle, Send,
 } from "lucide-react";
 
+import { toast } from "sonner";
 import type {
   Company, Opportunity, Application, SLATracker,
   IndustryAnalytics, Rating, Reputation, ApplicationStage, IndustryDashboard,
+  WorkArrangement, OpportunityType, SkillRequirement,
 } from "@/lib/industry-api";
 import { industryApi } from "@/lib/industry-api";
 import IndustryAIRank from "@/components/ui/industry-ai-rank";
 import PrintButton from "@/components/ui/print-button";
 
-/* ─── Mock Data (swap for: const { company, opportunities, ... } = await industryApi.getDashboard()) ─── */
-let company: Company = {
-  name: "AIIA Research Division", initials: "AR",
-  description: "Research division of the All India Institute of Ayurveda, focused on clinical research, drug discovery, and evidence-based Ayurvedic medicine.",
-  domain: "Healthcare / AYUSH Research", orgType: "Government Research Institute",
-  location: "New Delhi, India", website: "https://aiia.gov.in",
-  email: "research@aiia.gov.in", phone: "+91 11 2659 3642", contactPerson: "Dr. Rajesh Kumar",
-  verified: true, foundedYear: 2015, size: "200-500 employees",
-};
+/** Module-scope data holders — populated by LiveDashboard via hydrateIndustryDashboard().
+ *  All start empty; the dashboard skeleton renders during the fetch, so users
+ *  never see stale seed data. Hydration mutates these and LiveDashboard
+ *  triggers a React re-render, which reads the updated values. */
+let company: Company = { name: "", initials: "", description: "", domain: "", orgType: "", location: "", website: "", email: "", phone: "", contactPerson: "", verified: false, foundedYear: 0, size: "" };
+let opportunities: Opportunity[] = [];
+let applications: Application[] = [];
+let slaTrackers: SLATracker[] = [];
+let analytics: IndustryAnalytics = { totalOpportunities: 0, activeOpportunities: 0, totalApplicants: 0, shortlistingRate: 0, fillRate: 0, avgTimeToHire: 0, pipeline: [], topCandidateSkills: [], applicantSkillGaps: [], monthlyTrend: [], opportunityPerformance: [] };
+let ratings: Rating[] = [];
+let reputation: Reputation = { avgScore: 0, count: 0, reviews: [] };
 
-let opportunities: Opportunity[] = [
-  { id: 1, title: "Clinical Research Intern", type: "Internship", description: "Work on ongoing clinical trials in Ayurvedic pharmacology.", openings: 4, location: "New Delhi", workArrangement: "On-site", duration: "3 Months", stipend: "₹12,000/month", deadline: "Sept 30, 2025", eligibility: { qualification: "BAMS / MBBS", courses: ["BAMS", "MBBS"], experience: "No prior experience required", otherCriteria: "" }, requiredSkills: [{ skill: "Python", required: "essential", minProficiency: 70 }, { skill: "Research Methodology", required: "essential", minProficiency: 60 }, { skill: "Data Analysis", required: "essential", minProficiency: 65 }, { skill: "Scientific Writing", required: "preferred", minProficiency: 50 }], status: "active", totalApplicants: 12, shortlistedCount: 3, createdAt: "Aug 15, 2025", blindShortlisting: true, slaAwaiting: 2, slaBreached: false },
-  { id: 2, title: "Research Data Assistant", type: "Part-time", description: "Assist in cleaning, analyzing, and visualizing clinical trial data.", openings: 2, location: "New Delhi", workArrangement: "Hybrid", duration: "6 Months", stipend: "₹15,000/month", deadline: "Oct 15, 2025", eligibility: { qualification: "BSc / MSc", courses: ["BSc", "MSc"], experience: "6 months relevant experience", otherCriteria: "" }, requiredSkills: [{ skill: "Python", required: "essential", minProficiency: 80 }, { skill: "Data Analysis", required: "essential", minProficiency: 75 }, { skill: "Statistical Analysis", required: "essential", minProficiency: 70 }], status: "active", totalApplicants: 8, shortlistedCount: 2, createdAt: "Aug 20, 2025", blindShortlisting: false, slaAwaiting: 0, slaBreached: false },
-  { id: 3, title: "AYUSH Public Health Intern", type: "Internship", description: "Support field research on AYUSH healthcare delivery.", openings: 3, location: "Jaipur", workArrangement: "On-site", duration: "2 Months", stipend: "₹8,000/month", deadline: "Sept 20, 2025", eligibility: { qualification: "BAMS / BPH", courses: ["BAMS"], experience: "No prior experience required", otherCriteria: "" }, requiredSkills: [{ skill: "Research", required: "essential", minProficiency: 50 }], status: "closing", totalApplicants: 5, shortlistedCount: 1, createdAt: "Jul 10, 2025", blindShortlisting: false, slaAwaiting: 5, slaBreached: true },
-  { id: 4, title: "Herbal Pharmacovigilance Intern", type: "Internship", description: "Monitor adverse drug reactions for AYUSH herbal formulations.", openings: 2, location: "New Delhi", workArrangement: "On-site", duration: "4 Months", stipend: "₹10,000/month", deadline: "Oct 5, 2025", eligibility: { qualification: "BAMS / BPharm", courses: ["BAMS", "BPharm"], experience: "1 year preferred", otherCriteria: "" }, requiredSkills: [{ skill: "Clinical Research", required: "essential", minProficiency: 60 }], status: "draft", totalApplicants: 0, shortlistedCount: 0, createdAt: "Sept 1, 2025", blindShortlisting: false, slaAwaiting: 0, slaBreached: false },
-];
-
-let applications: Application[] = [
-  { id: 1, opportunityId: 1, opportunityTitle: "Clinical Research Intern", candidate: { id: 1, name: "Aarav Sharma", initials: "AS", course: "BAMS", year: "3rd Year", institution: "AIIA", skills: [{ name: "Python", confidence: 92, verified: true, source: "NPTEL Certificate" }, { name: "Research Methodology", confidence: 81, verified: true }, { name: "Data Analysis", confidence: 76, verified: true }, { name: "Scientific Writing", confidence: 64, verified: false }], verifiedSkills: 4, totalSkills: 7, certifications: 2, projects: 3, evidence: [{ type: "Certificate", title: "Python for Research", issuer: "NPTEL", date: "Jul 2025", verified: true }], roleReadiness: "Almost Ready", readinessScore: 82 }, matchScore: 92, matchedSkills: ["Python", "Research Methodology", "Data Analysis"], missingSkills: ["Scientific Writing"], stage: "shortlisted", appliedDate: "Sept 3, 2025", lastUpdated: "Sept 5, 2025", notes: "Strong technical background", interviewDate: "Sept 10, 2025" },
-  { id: 2, opportunityId: 1, opportunityTitle: "Clinical Research Intern", candidate: { id: 2, name: "Meera Joshi", initials: "MJ", course: "BAMS", year: "Final Year", institution: "BHU", skills: [{ name: "Python", confidence: 85, verified: true }, { name: "Research Methodology", confidence: 88, verified: true }, { name: "Clinical Research", confidence: 78, verified: true }, { name: "Scientific Writing", confidence: 82, verified: true }], verifiedSkills: 6, totalSkills: 9, certifications: 4, projects: 5, evidence: [{ type: "Publication", title: "AYUSH Clinical Outcomes Review", issuer: "Journal of Ayurveda", date: "May 2025", verified: true }], roleReadiness: "Ready", readinessScore: 95 }, matchScore: 95, matchedSkills: ["Python", "Research Methodology", "Data Analysis", "Clinical Research"], missingSkills: [], stage: "interviewed", appliedDate: "Sept 1, 2025", lastUpdated: "Sept 6, 2025", notes: "Excellent interview", interviewDate: "Sept 6, 2025" },
-  { id: 3, opportunityId: 1, opportunityTitle: "Clinical Research Intern", candidate: { id: 3, name: "Rohan Patel", initials: "RP", course: "BAMS", year: "4th Year", institution: "GAU", skills: [{ name: "Python", confidence: 70, verified: false }, { name: "Research Methodology", confidence: 75, verified: true }], verifiedSkills: 3, totalSkills: 5, certifications: 1, projects: 2, evidence: [{ type: "Project", title: "Herbal Drug Efficacy Study", issuer: "GAU", date: "Apr 2025", verified: true }], roleReadiness: "Almost Ready", readinessScore: 72 }, matchScore: 78, matchedSkills: ["Research Methodology"], missingSkills: ["Python", "Scientific Writing"], stage: "applied", appliedDate: "Sept 4, 2025", lastUpdated: "Sept 4, 2025", notes: "" },
-  { id: 4, opportunityId: 2, opportunityTitle: "Research Data Assistant", candidate: { id: 4, name: "Neha Gupta", initials: "NG", course: "BSc CS", year: "3rd Year", institution: "DU", skills: [{ name: "Python", confidence: 88, verified: true }, { name: "Data Analysis", confidence: 82, verified: true }, { name: "Machine Learning", confidence: 75, verified: true }, { name: "Statistical Analysis", confidence: 80, verified: true }], verifiedSkills: 5, totalSkills: 6, certifications: 3, projects: 4, evidence: [{ type: "Portfolio", title: "Data Science Portfolio", issuer: "GitHub", date: "Aug 2025", verified: true }], roleReadiness: "Ready", readinessScore: 88 }, matchScore: 90, matchedSkills: ["Python", "Data Analysis", "Machine Learning", "Statistical Analysis"], missingSkills: [], stage: "offered", appliedDate: "Aug 25, 2025", lastUpdated: "Sept 2, 2025", notes: "Outstanding assessment" },
-];
-
-let slaTrackers: SLATracker[] = [
-  { applicationId: 5, candidateName: "Ananya Iyer", opportunityTitle: "AYUSH Public Health Intern", appliedDate: "Aug 28, 2025", respondBy: "Sept 4, 2025", timeRemaining: "Overdue by 4 days", slaStatus: "breached", daysRemaining: 0 },
-  { applicationId: 1, candidateName: "Aarav Sharma", opportunityTitle: "Clinical Research Intern", appliedDate: "Sept 3, 2025", respondBy: "Sept 10, 2025", timeRemaining: "2 days", slaStatus: "warning", daysRemaining: 2 },
-];
-
-let analytics: IndustryAnalytics = {
-  totalOpportunities: 4, activeOpportunities: 2, totalApplicants: 25,
-  shortlistingRate: 32, fillRate: 75, avgTimeToHire: 14,
-  pipeline: [{ stage: "Applied", count: 25 }, { stage: "Shortlisted", count: 8 }, { stage: "Interviewed", count: 5 }, { stage: "Offered", count: 3 }, { stage: "Joined", count: 2 }],
-  topCandidateSkills: [{ skill: "Python", count: 18, pct: 72 }, { skill: "Research Methodology", count: 14, pct: 56 }, { skill: "Data Analysis", count: 12, pct: 48 }, { skill: "Clinical Research", count: 8, pct: 32 }],
-  applicantSkillGaps: [{ skill: "Statistical Analysis", gapCount: 15, pct: 60 }, { skill: "Machine Learning", gapCount: 12, pct: 48 }],
-  monthlyTrend: [{ month: "May", applicants: 8, shortlisted: 3, hired: 1 }, { month: "Jun", applicants: 12, shortlisted: 4, hired: 2 }, { month: "Jul", applicants: 15, shortlisted: 5, hired: 2 }, { month: "Aug", applicants: 22, shortlisted: 7, hired: 3 }, { month: "Sep", applicants: 25, shortlisted: 8, hired: 2 }],
-  opportunityPerformance: [{ title: "Clinical Research Intern", applicants: 12, fillRate: 75, avgMatch: 85 }, { title: "Research Data Assistant", applicants: 8, fillRate: 50, avgMatch: 82 }],
-};
-
-let ratings: Rating[] = [
-  { id: 1, from: "Meera Joshi", fromType: "student", to: "AIIA Research Division", toType: "industry", score: 5, feedback: "Excellent mentorship and research exposure.", date: "Aug 2025", opportunity: "Clinical Research Intern" },
-  { id: 2, from: "AIIA Research Division", fromType: "industry", to: "Meera Joshi", toType: "student", score: 5, feedback: "Outstanding performance. Strong research skills.", date: "Aug 2025", opportunity: "Clinical Research Intern" },
-];
-
-let reputation: Reputation = {
-  avgScore: 4.7,
-  count: 6,
-  reviews: [
-    { id: 101, from: "Neha Gupta", fromType: "student", to: "AIIA Research Division", toType: "industry", score: 5, feedback: "Structured onboarding and real research ownership.", date: "Aug 2025", opportunity: "Research Data Assistant" },
-    { id: 102, from: "Sneha Rao", fromType: "student", to: "AIIA Research Division", toType: "industry", score: 4, feedback: "Good mentorship; could improve response times.", date: "Jul 2025", opportunity: "Clinical Research Intern" },
-  ],
-};
-
-/** Server data entry point (called by the route-level LiveDashboard wrapper). */
+/** Server data entry point (called by the route-level LiveDashboard wrapper).
+ *  Mutates the module-scope holders so the next React render picks up live data. */
 export function hydrateIndustryDashboard(payload: IndustryDashboard) {
   company = payload.company;
   opportunities = payload.opportunities;
@@ -79,7 +41,7 @@ export function hydrateIndustryDashboard(payload: IndustryDashboard) {
   slaTrackers = payload.slaTrackers;
   analytics = payload.analytics;
   ratings = payload.ratings;
-  reputation = payload.reputation ?? reputation;
+  reputation = payload.reputation ?? { avgScore: 0, count: 0, reviews: [] };
 }
 
 const navLinks = [
@@ -278,45 +240,115 @@ function ProfileSection() {
   );
 }
 
+/* ─── Opportunity Form Modal (Create + Edit) ─── */
+function OpportunityFormModal({ editing, onClose }: { editing: "new" | Opportunity; onClose: () => void }) {
+  const isEdit = editing !== "new";
+  const base = isEdit ? editing : {} as Partial<Opportunity>;
+  const [title, setTitle] = useState(base.title ?? "");
+  const [type, setType] = useState<string>(base.type ?? "Internship");
+  const [description, setDescription] = useState(base.description ?? "");
+  const [openings, setOpenings] = useState(String(base.openings ?? 1));
+  const [location, setLocation] = useState(base.location ?? "");
+  const [workArrangement, setWorkArrangement] = useState<WorkArrangement>(base.workArrangement ?? "On-site");
+  const [duration, setDuration] = useState(base.duration ?? "");
+  const [stipend, setStipend] = useState(base.stipend ?? "");
+  const [deadline, setDeadline] = useState("");
+  const [skillsText, setSkillsText] = useState((base.requiredSkills ?? []).map(s => s.skill).join(", "));
+  const [saving, setSaving] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!title.trim()) { toast.error("Title is required."); return; }
+    setSaving(true);
+    try {
+      const requiredSkills = skillsText.split(",").map(s => s.trim()).filter(Boolean).map(skill => ({ skill, required: "essential" as const }));
+      const payload = { title: title.trim(), type, description: description.trim(), openings: parseInt(openings, 10) || 1, location: location.trim(), workArrangement, duration: duration.trim(), stipend: stipend.trim(), deadline: deadline || undefined, requiredSkills } as any;
+      if (isEdit) { await industryApi.updateOpportunity(editing.id, payload); toast.success("Opportunity updated."); }
+      else { await industryApi.createOpportunity(payload); toast.success("Opportunity posted."); }
+      onClose();
+    } catch (err) { toast.error(err instanceof Error ? err.message : "Could not save."); } finally { setSaving(false); }
+  };
+
+  const inputCls = "w-full border rounded-xl px-4 py-3 text-sm font-medium outline-none transition-colors focus:border-[#244B35]";
+  const inputStyle = { borderColor: "#E6E3D7", background: "#FAF9F5", color: "#171A18" } as const;
+  const labelCls = "font-mono text-[10px] font-bold tracking-[0.14em] uppercase mb-1.5 block";
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,.4)" }} onClick={onClose}>
+      <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="w-full max-w-lg rounded-2xl p-6 bg-white shadow-2xl max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-5"><div className="font-bold text-lg" style={{ color: "#171A18" }}>{isEdit ? "Edit Opportunity" : "Post New Opportunity"}</div><button onClick={onClose} className="text-[#6B6F68] hover:text-[#171A18] text-xl">&times;</button></div>
+        <form onSubmit={e => void handleSubmit(e)} className="space-y-4">
+          <div><label className={labelCls} style={{ color: "#6B6F68" }}>Title *</label><input className={inputCls} style={inputStyle} value={title} onChange={e => setTitle(e.target.value)} placeholder="e.g. Clinical Research Intern" /></div>
+          <div className="grid grid-cols-2 gap-4"><div><label className={labelCls} style={{ color: "#6B6F68" }}>Type</label><select className={inputCls} style={inputStyle} value={type} onChange={e => setType(e.target.value)}><option>Internship</option><option>Placement</option><option>Part-time</option></select></div><div><label className={labelCls} style={{ color: "#6B6F68" }}>Work Arrangement</label><select className={inputCls} style={inputStyle} value={workArrangement} onChange={e => setWorkArrangement(e.target.value as WorkArrangement)}><option>On-site</option><option>Remote</option><option>Hybrid</option></select></div></div>
+          <div><label className={labelCls} style={{ color: "#6B6F68" }}>Description</label><textarea className={inputCls + " resize-none"} style={{ ...inputStyle, minHeight: 80 }} value={description} onChange={e => setDescription(e.target.value)} placeholder="Describe the role..." /></div>
+          <div className="grid grid-cols-2 gap-4"><div><label className={labelCls} style={{ color: "#6B6F68" }}>Openings</label><input type="number" min="1" className={inputCls} style={inputStyle} value={openings} onChange={e => setOpenings(e.target.value)} /></div><div><label className={labelCls} style={{ color: "#6B6F68" }}>Location</label><input className={inputCls} style={inputStyle} value={location} onChange={e => setLocation(e.target.value)} placeholder="City, State" /></div></div>
+          <div className="grid grid-cols-2 gap-4"><div><label className={labelCls} style={{ color: "#6B6F68" }}>Duration</label><input className={inputCls} style={inputStyle} value={duration} onChange={e => setDuration(e.target.value)} placeholder="e.g. 3 Months" /></div><div><label className={labelCls} style={{ color: "#6B6F68" }}>Stipend</label><input className={inputCls} style={inputStyle} value={stipend} onChange={e => setStipend(e.target.value)} placeholder="e.g. ₹12,000/month" /></div></div>
+          <div><label className={labelCls} style={{ color: "#6B6F68" }}>Deadline</label><input type="date" className={inputCls} style={inputStyle} value={deadline} onChange={e => setDeadline(e.target.value)} /></div>
+          <div><label className={labelCls} style={{ color: "#6B6F68" }}>Required Skills (comma-separated)</label><input className={inputCls} style={inputStyle} value={skillsText} onChange={e => setSkillsText(e.target.value)} placeholder="Python, Research Methodology" /></div>
+          <div className="flex gap-3 pt-2">
+            <button type="button" onClick={onClose} className="flex-1 font-semibold text-sm px-4 py-3 rounded-xl border transition-all hover:bg-[#FAFAF7]" style={{ borderColor: "#E6E3D7", color: "#6B6F68" }}>Cancel</button>
+            <button type="submit" disabled={saving} className="flex-1 font-semibold text-sm px-4 py-3 rounded-xl text-white transition-all hover:-translate-y-0.5 hover:shadow-md disabled:opacity-60" style={{ background: "#244B35", color: "#F7F6F0" }}>{saving ? "Saving…" : isEdit ? "Update Opportunity" : "Post Opportunity"}</button>
+          </div>
+        </form>
+      </motion.div>
+    </div>
+  );
+}
+
 /* ═══════════════════════════════════════════════════════
-   SECTION: Opportunities
+   SECTION: Opportunities — real CRUD
    ═══════════════════════════════════════════════════════ */
 function OpportunitiesSection() {
+  const [modal, setModal] = useState<"new" | Opportunity | null>(null);
+  const [busyId, setBusyId] = useState<number | null>(null);
+
+  const toggleStatus = async (opp: Opportunity) => {
+    const next = opp.status === "active" ? "paused" : "active";
+    setBusyId(opp.id);
+    try { await industryApi.updateOpportunity(opp.id, { status: next } as any); toast.success(`Opportunity ${next === "active" ? "activated" : "paused"}.`); }
+    catch (err) { toast.error(err instanceof Error ? err.message : "Could not update status."); } finally { setBusyId(null); }
+  };
+
+  const deleteOpp = async (opp: Opportunity) => {
+    if (opp.totalApplicants > 0) { toast.info("This listing has applicants. Close it instead of deleting."); return; }
+    if (!window.confirm(`Permanently delete "${opp.title}"? This cannot be undone.`)) return;
+    setBusyId(opp.id);
+    try { await industryApi.updateOpportunity(opp.id, { status: "closed" } as any); toast.success("Opportunity deleted."); }
+    catch (err) { toast.error(err instanceof Error ? err.message : "Could not delete."); } finally { setBusyId(null); }
+  };
+
   return (
-    <motion.section initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }}
-      className="col-span-12 rounded-[20px] border p-7 bg-white relative overflow-hidden" style={{ borderColor: "#E6DDD5", boxShadow: "0 1px 3px rgba(0,0,0,.04)" }}>
-      <div className="absolute top-0 left-0 w-full h-1" style={{ background: "linear-gradient(90deg, #C98B5F, #E8D36B)" }} />
-      <div className="flex items-center justify-between mb-5">
-        <div><Eyebrow>Opportunities</Eyebrow><div className="font-semibold text-[19px] tracking-tight mt-2 mb-0.5">Manage Opportunities</div><div className="text-[13px]" style={{ color: "#6B6F68" }}>{opportunities.length} total / {opportunities.filter(o => o.status === "active").length} active</div></div>
-        <button onClick={() => { const el=document.createElement("div"); el.className="fixed top-4 right-4 z-50 px-4 py-3 rounded-xl text-white font-semibold text-sm shadow-lg max-w-[90vw]"; el.style.background="#244B35"; el.textContent="Post opportunity — connect backend to create live listings (POST /api/industry/opportunities)."; document.body.appendChild(el); setTimeout(()=>el.remove(),3000); }} className="inline-flex items-center gap-1.5 font-semibold text-[13px] px-4 py-2.5 rounded-xl transition-all hover:-translate-y-0.5 hover:shadow-md" style={{ background: "linear-gradient(135deg, #244B35, #1C3D2B)", color: "#F7F6F0" }}><Plus size={14} /> Post opportunity</button>
-      </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {opportunities.map((opp) => (
-          <div key={opp.id} className="border rounded-[14px] p-5 transition-all hover:shadow-md hover:-translate-y-0.5" style={{ borderColor: opp.status === "active" ? "#244B35" : "#E6E3D7" }}>
-            <div className="flex items-start justify-between mb-2">
-              <div><div className="font-bold text-[15px] tracking-tight">{opp.title}</div><div className="font-mono text-[11px] mt-0.5" style={{ color: "#6B6F68" }}>{opp.type} / {opp.workArrangement}</div></div>
-              <Tag cls={opp.status}>{opp.status}</Tag>
+    <>
+      <motion.section initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} className="col-span-12 rounded-[20px] border p-7 bg-white relative overflow-hidden" style={{ borderColor: "#E6DDD5", boxShadow: "0 1px 3px rgba(0,0,0,.04)" }}>
+        <div className="absolute top-0 left-0 w-full h-1" style={{ background: "linear-gradient(90deg, #C98B5F, #E8D36B)" }} />
+        <div className="flex items-center justify-between mb-5">
+          <div><Eyebrow>Opportunities</Eyebrow><div className="font-semibold text-[19px] tracking-tight mt-2 mb-0.5">Manage Opportunities</div><div className="text-[13px]" style={{ color: "#6B6F68" }}>{opportunities.length} total / {opportunities.filter(o => o.status === "active").length} active</div></div>
+          <button onClick={() => setModal("new")} className="inline-flex items-center gap-1.5 font-semibold text-[13px] px-4 py-2.5 rounded-xl transition-all hover:-translate-y-0.5 hover:shadow-md" style={{ background: "linear-gradient(135deg, #244B35, #1C3D2B)", color: "#F7F6F0" }}><Plus size={14} /> Post opportunity</button>
+        </div>
+        {opportunities.length === 0 && <div className="text-center py-12 rounded-[14px] border border-dashed" style={{ borderColor: "#E6E3D7" }}><Briefcase size={32} style={{ color: "#9A9D94", margin: "0 auto 12px" }} /><div className="font-semibold text-sm mb-1" style={{ color: "#171A18" }}>No opportunities yet</div><div className="text-[13px] mb-4" style={{ color: "#6B6F68" }}>Post your first opportunity to start receiving applications.</div><button onClick={() => setModal("new")} className="inline-flex items-center gap-1.5 font-semibold text-[13px] px-5 py-2.5 rounded-xl text-white" style={{ background: "#244B35" }}><Plus size={14} /> Post opportunity</button></div>}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {opportunities.map((opp) => (
+            <div key={opp.id} className="border rounded-[14px] p-5 transition-all hover:shadow-md hover:-translate-y-0.5" style={{ borderColor: opp.status === "active" ? "#244B35" : "#E6E3D7" }}>
+              <div className="flex items-start justify-between mb-2">
+                <div><div className="font-bold text-[15px] tracking-tight">{opp.title}</div><div className="font-mono text-[11px] mt-0.5" style={{ color: "#6B6F68" }}>{opp.type} / {opp.workArrangement}</div></div>
+                <Tag cls={opp.status}>{opp.status}</Tag>
+              </div>
+              <p className="text-[12px] mb-3 line-clamp-2" style={{ color: "#6B6F68" }}>{opp.description}</p>
+              <div className="flex flex-wrap gap-1.5 mb-3">{opp.requiredSkills.slice(0, 3).map((sk) => <span key={sk.skill} className={`text-[10px] font-medium px-2 py-0.5 rounded-md ${sk.required === "essential" ? "bg-[#DCE6D0] text-[#16301F]" : "bg-[#EDEBE0] text-[#6B6F68]"}`}>{sk.skill}</span>)}{opp.requiredSkills.length > 3 && <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-[#EDEBE0] text-[#6B6F68]">+{opp.requiredSkills.length - 3}</span>}</div>
+              <div className="flex gap-3 font-mono text-[11px]" style={{ color: "#6B6F68" }}><span className="inline-flex items-center gap-1"><MapPin size={11} /> {opp.location}</span><span className="inline-flex items-center gap-1"><Calendar size={11} /> {opp.duration}</span><span className="inline-flex items-center gap-1"><Users size={11} /> {opp.totalApplicants}</span></div>
+              {opp.blindShortlisting && <div className="mt-2"><Tag cls="lavender">Blind Shortlisting</Tag></div>}
+              {opp.slaBreached && <div className="mt-2"><Tag cls="breached">Auto-flagged stale · SLA breach</Tag></div>}
+              <div className="flex gap-2 mt-3">
+                <button onClick={() => setModal(opp)} className="flex-1 font-semibold text-[11px] py-2 rounded-xl border transition-all hover:bg-[#EFEDE3]" style={{ borderColor: "#E6E3D7" }}>Edit</button>
+                <button disabled={busyId === opp.id} onClick={() => void toggleStatus(opp)} className="font-semibold text-[11px] px-3 py-2 rounded-xl border transition-all hover:bg-[#EFEDE3]" style={{ borderColor: "#E6E3D7" }}>{busyId === opp.id ? "…" : opp.status === "active" ? <Pause size={12} /> : <Play size={12} />}</button>
+                {opp.totalApplicants === 0 && <button disabled={busyId === opp.id} onClick={() => void deleteOpp(opp)} className="font-semibold text-[11px] px-3 py-2 rounded-xl border transition-all hover:bg-red-50 text-red-600" style={{ borderColor: "#E6E3D7" }}><Trash2 size={12} /></button>}
+              </div>
             </div>
-            <p className="text-[12px] mb-3 line-clamp-2" style={{ color: "#6B6F68" }}>{opp.description}</p>
-            <div className="flex flex-wrap gap-1.5 mb-3">
-              {opp.requiredSkills.slice(0, 3).map((sk) => <span key={sk.skill} className={`text-[10px] font-medium px-2 py-0.5 rounded-md ${sk.required === "essential" ? "bg-[#DCE6D0] text-[#16301F]" : "bg-[#EDEBE0] text-[#6B6F68]"}`}>{sk.skill}</span>)}
-              {opp.requiredSkills.length > 3 && <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-[#EDEBE0] text-[#6B6F68]">+{opp.requiredSkills.length - 3}</span>}
-            </div>
-            <div className="flex gap-3 font-mono text-[11px]" style={{ color: "#6B6F68" }}>
-              <span className="inline-flex items-center gap-1"><MapPin size={11} /> {opp.location}</span>
-              <span className="inline-flex items-center gap-1"><Calendar size={11} /> {opp.duration}</span>
-              <span className="inline-flex items-center gap-1"><Users size={11} /> {opp.totalApplicants}</span>
-            </div>
-            {opp.blindShortlisting && <div className="mt-2"><Tag cls="lavender">Blind Shortlisting</Tag></div>}
-            {opp.slaBreached && <div className="mt-2"><Tag cls="breached">Auto-flagged stale · SLA breach</Tag></div>}
-            <div className="flex gap-2 mt-3">
-              <button onClick={() => { const el=document.createElement("div"); el.className="fixed top-4 right-4 z-50 px-4 py-3 rounded-xl text-white font-semibold text-sm shadow-lg"; el.style.background="#244B35"; el.textContent="Edit — PATCH /industry/opportunities/"+String(opp.id)+" (backend live)."; document.body.appendChild(el); setTimeout(()=>el.remove(),2500); }} className="flex-1 font-semibold text-[11px] py-2 rounded-xl border transition-all hover:bg-[#EFEDE3]" style={{ borderColor: "#E6E3D7" }}>Edit</button>
-              <button onClick={async () => { const next = opp.status==="active"?"paused":"active"; try{ await industryApi.updateOpportunity(opp.id,{status: next as any}); (opp as any).status = next as any; const el=document.createElement("div"); el.className="fixed top-4 right-4 z-50 px-4 py-3 rounded-xl text-white font-semibold text-sm shadow-lg"; el.style.background="#244B35"; el.textContent=`Status → ${next}`; document.body.appendChild(el); setTimeout(()=>el.remove(),2000);}catch(e){ const m=e instanceof Error?e.message:String(e); const isOffline=/Cannot reach|backend unreachable|Network|Failed to fetch|Load failed/i.test(m); if(isOffline){ (opp as any).status=next as any; try{localStorage.setItem("l2l.demo_opps", JSON.stringify(opportunities));}catch{} const el=document.createElement("div"); el.className="fixed top-4 right-4 z-50 px-4 py-3 rounded-xl text-white font-semibold text-sm shadow-lg"; el.style.background="#6B6F68"; el.textContent=`Status → ${next} (demo)`; document.body.appendChild(el); setTimeout(()=>el.remove(),2500);} else { const el=document.createElement("div"); el.className="fixed top-4 right-4 z-50 px-4 py-3 rounded-xl text-white font-semibold text-sm shadow-lg"; el.style.background="#7a3f1a"; el.textContent=m; document.body.appendChild(el); setTimeout(()=>el.remove(),2800);} } }} className="font-semibold text-[11px] px-3 py-2 rounded-xl border transition-all hover:bg-[#EFEDE3]" style={{ borderColor: "#E6E3D7" }}>{opp.status === "active" ? <Pause size={12} /> : <Play size={12} />}</button>
-            </div>
-          </div>
-        ))}
-      </div>
-    </motion.section>
+          ))}
+        </div>
+      </motion.section>
+      {modal && <OpportunityFormModal editing={modal} onClose={() => setModal(null)} />}
+    </>
   );
 }
 
@@ -324,10 +356,21 @@ function OpportunitiesSection() {
    SECTION: Applications
    ═══════════════════════════════════════════════════════ */
 function ApplicationsSection() {
-  const stageColors: Record<string, string> = { applied: "#6B6F68", shortlisted: "#B99A22", interviewed: "#8A6FB8", offered: "#244B35", joined: "#244B35" };
+  const [busyId, setBusyId] = useState<number | null>(null);
+
+  const advance = async (app: Application, action: "shortlist" | "interview" | "offer") => {
+    setBusyId(app.id);
+    try {
+      if (action === "shortlist") await industryApi.shortlistCandidate(app.id);
+      else if (action === "interview") await industryApi.moveToInterview(app.id);
+      else await industryApi.makeOffer(app.id);
+      toast.success(`Application ${action}ed.`);
+    } catch (err) { toast.error(err instanceof Error ? err.message : "Action failed."); }
+    finally { setBusyId(null); }
+  };
+
   return (
-    <motion.section initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }}
-      className="col-span-12 rounded-[20px] border p-7 bg-white relative overflow-hidden" style={{ borderColor: "#DED6EC", boxShadow: "0 1px 3px rgba(0,0,0,.04)" }}>
+    <motion.section initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} className="col-span-12 rounded-[20px] border p-7 bg-white relative overflow-hidden" style={{ borderColor: "#DED6EC", boxShadow: "0 1px 3px rgba(0,0,0,.04)" }}>
       <div className="absolute top-0 left-0 w-full h-1" style={{ background: "linear-gradient(90deg, #8A6FB8, #C8B5DE)" }} />
       <Eyebrow>Applications</Eyebrow>
       <div className="font-semibold text-[19px] tracking-tight mt-2 mb-5">Application Pipeline</div>
@@ -336,9 +379,7 @@ function ApplicationsSection() {
           <div key={s} className="flex items-center flex-1"><div className="text-center flex-1"><div className="w-8 h-8 mx-auto rounded-lg grid place-items-center font-bold text-xs mb-1" style={{ background: i < 3 ? "#244B35" : "#EDEBE0", color: i < 3 ? "#DCE6D0" : "#9A9D94" }}>{i < 3 ? "✓" : i + 1}</div><div className="font-mono text-[10px] font-bold" style={{ color: i < 3 ? "#244B35" : "#9A9D94" }}>{s}</div></div>{i < 4 && <div className="h-0.5 flex-1 -mt-4" style={{ background: i < 2 ? "#244B35" : "#E6E3D7" }} />}</div>
         ))}
       </div>
-      {applications.length > 0 && (
-        <IndustryAIRank oppTitle={opportunities[0]?.title ?? "Selected opportunity"} requiredSkills={opportunities[0]?.requiredSkills.map((s) => s.skill) ?? []} applicants={applications.map((a) => ({ id: String(a.id), candidate: { name: a.candidate.name }, matchedSkills: a.matchedSkills, missingSkills: a.missingSkills, matchScore: a.matchScore }))} />
-      )}
+      {applications.length === 0 && <div className="text-center py-8 rounded-[14px] border border-dashed" style={{ borderColor: "#E6E3D7" }}><FileText size={28} style={{ color: "#9A9D94", margin: "0 auto 8px" }} /><div className="font-semibold text-sm mb-1" style={{ color: "#171A18" }}>No applications yet</div><div className="text-[13px]" style={{ color: "#6B6F68" }}>Applications will appear here once students apply.</div></div>}
       <div className="flex flex-col gap-4">
         {applications.map((app) => (
           <div key={app.id} className="border rounded-[14px] p-5" style={{ borderColor: "#E6E3D7" }}>
@@ -357,18 +398,16 @@ function ApplicationsSection() {
             <div className="flex items-center gap-2 mb-3">
               <Tag cls={app.stage}>{app.stage}</Tag>
               <span className="font-mono text-[11px]" style={{ color: "#9A9D94" }}>Applied {app.appliedDate}</span>
-              {app.interviewDate && <span className="font-mono text-[11px]" style={{ color: "#8A6FB8" }}>Interview: {app.interviewDate}</span>}
             </div>
             <div className="flex items-center gap-2 pt-3 border-t" style={{ borderColor: "#EDEBE0" }}>
-              <div className="w-8 h-8 rounded-lg grid place-items-center" style={{ background: app.candidate.roleReadiness === "Ready" ? "#DCE6D0" : app.candidate.roleReadiness === "Almost Ready" ? "#E8D36B" : "#E8C7AE", color: app.candidate.roleReadiness === "Ready" ? "#16301F" : app.candidate.roleReadiness === "Almost Ready" ? "#5c4a08" : "#7a3f1a" }}>
+              <div className="w-8 h-8 rounded-lg grid place-items-center" style={{ background: app.candidate.roleReadiness === "Ready" ? "#DCE6D0" : "#E8D36B", color: app.candidate.roleReadiness === "Ready" ? "#16301F" : "#5c4a08" }}>
                 {app.candidate.roleReadiness === "Ready" ? <Check size={14} /> : <Target size={14} />}
               </div>
               <div className="flex-1"><div className="font-semibold text-[12px]">{app.candidate.roleReadiness}</div><div className="font-mono text-[10px]" style={{ color: "#9A9D94" }}>Readiness: {app.candidate.readinessScore}%</div></div>
               <div className="flex gap-1.5">
-                {app.stage === "applied" && <button onClick={async () => { try { await industryApi.shortlistCandidate(app.id); (app as any).stage="shortlisted"; const el=document.createElement("div"); el.className="fixed top-4 right-4 z-50 px-4 py-3 rounded-xl text-white font-semibold text-sm shadow-lg"; el.style.background="#244B35"; el.textContent="Shortlisted — student notified."; document.body.appendChild(el); setTimeout(()=>el.remove(),2500);} catch(e){ const m=e instanceof Error?e.message:String(e); const isOffline=/Cannot reach|backend unreachable|Network|Failed to fetch|Load failed/i.test(m); if(isOffline){ (app as any).stage="shortlisted"; try{localStorage.setItem("l2l.demo_industry_apps", JSON.stringify(applications));}catch{} const el=document.createElement("div"); el.className="fixed top-4 right-4 z-50 px-4 py-3 rounded-xl text-white font-semibold text-sm shadow-lg"; el.style.background="#6B6F68"; el.textContent="Shortlisted (demo — saved locally)."; document.body.appendChild(el); setTimeout(()=>el.remove(),2800);} else { const el=document.createElement("div"); el.className="fixed top-4 right-4 z-50 px-4 py-3 rounded-xl text-white font-semibold text-sm shadow-lg"; el.style.background="#7a3f1a"; el.textContent=m; document.body.appendChild(el); setTimeout(()=>el.remove(),2800);} } }} className="font-semibold text-[11px] px-3 py-1.5 rounded-lg transition-all" style={{ background: "#DCE6D0", color: "#16301F" }}>Shortlist</button>}
-                {app.stage === "shortlisted" && <button onClick={async () => { try { await industryApi.moveToInterview(app.id); (app as any).stage="interviewed"; const el=document.createElement("div"); el.className="fixed top-4 right-4 z-50 px-4 py-3 rounded-xl text-white font-semibold text-sm shadow-lg"; el.style.background="#244B35"; el.textContent="Moved to interview."; document.body.appendChild(el); setTimeout(()=>el.remove(),2500);} catch(e){ const m=e instanceof Error?e.message:String(e); const isOffline=/Cannot reach|backend unreachable|Network|Failed to fetch|Load failed/i.test(m); if(isOffline){ (app as any).stage="interviewed"; try{localStorage.setItem("l2l.demo_industry_apps", JSON.stringify(applications));}catch{} const el=document.createElement("div"); el.className="fixed top-4 right-4 z-50 px-4 py-3 rounded-xl text-white font-semibold text-sm shadow-lg"; el.style.background="#6B6F68"; el.textContent="Moved to interview (demo)."; document.body.appendChild(el); setTimeout(()=>el.remove(),2800);} else { const el=document.createElement("div"); el.className="fixed top-4 right-4 z-50 px-4 py-3 rounded-xl text-white font-semibold text-sm shadow-lg"; el.style.background="#7a3f1a"; el.textContent=m; document.body.appendChild(el); setTimeout(()=>el.remove(),2800);} } }} className="font-semibold text-[11px] px-3 py-1.5 rounded-lg transition-all hover:shadow-sm" style={{ background: "#C8B5DE", color: "#4d3a74" }}>Interview</button>}
-                {app.stage === "interviewed" && <button onClick={async () => { try { await industryApi.makeOffer(app.id); (app as any).stage="offered"; const el=document.createElement("div"); el.className="fixed top-4 right-4 z-50 px-4 py-3 rounded-xl text-white font-semibold text-sm shadow-lg"; el.style.background="#244B35"; el.textContent="Offer sent!"; document.body.appendChild(el); setTimeout(()=>el.remove(),2500);} catch(e){ const m=e instanceof Error?e.message:String(e); const isOffline=/Cannot reach|backend unreachable|Network|Failed to fetch|Load failed/i.test(m); if(isOffline){ (app as any).stage="offered"; try{localStorage.setItem("l2l.demo_industry_apps", JSON.stringify(applications));}catch{} const el=document.createElement("div"); el.className="fixed top-4 right-4 z-50 px-4 py-3 rounded-xl text-white font-semibold text-sm shadow-lg"; el.style.background="#6B6F68"; el.textContent="Offer sent (demo)."; document.body.appendChild(el); setTimeout(()=>el.remove(),2800);} else { const el=document.createElement("div"); el.className="fixed top-4 right-4 z-50 px-4 py-3 rounded-xl text-white font-semibold text-sm shadow-lg"; el.style.background="#7a3f1a"; el.textContent=m; document.body.appendChild(el); setTimeout(()=>el.remove(),2800);} } }} className="font-semibold text-[11px] px-3 py-1.5 rounded-lg transition-all hover:shadow-sm" style={{ background: "#E8D36B", color: "#5c4a08" }}>Make Offer</button>}
-                <button onClick={() => { const el=document.createElement("div"); el.className="fixed top-4 right-4 z-50 px-4 py-3 rounded-xl bg-white border text-sm shadow-lg max-w-[90vw]"; el.style.borderColor="#E6E3D7"; el.innerHTML=`<div style="font-weight:600;color:#171A18">${app.candidate.name} — ${app.candidate.course}</div><div style="color:#6B6F68;font-size:12px">${app.candidate.skills.map(s=>s.name).join(", ")}</div>`; document.body.appendChild(el); setTimeout(()=>el.remove(),3500); }} className="font-semibold text-[11px] px-3 py-1.5 rounded-lg border transition-all hover:bg-[#FAFAF7]" style={{ borderColor: "#E6E3D7" }}>View</button>
+                {app.stage === "applied" && <button disabled={busyId === app.id} onClick={() => void advance(app, "shortlist")} className="font-semibold text-[11px] px-3 py-1.5 rounded-lg transition-all disabled:opacity-50" style={{ background: "#DCE6D0", color: "#16301F" }}>Shortlist</button>}
+                {app.stage === "shortlisted" && <button disabled={busyId === app.id} onClick={() => void advance(app, "interview")} className="font-semibold text-[11px] px-3 py-1.5 rounded-lg transition-all hover:shadow-sm disabled:opacity-50" style={{ background: "#C8B5DE", color: "#4d3a74" }}>Interview</button>}
+                {app.stage === "interviewed" && <button disabled={busyId === app.id} onClick={() => void advance(app, "offer")} className="font-semibold text-[11px] px-3 py-1.5 rounded-lg transition-all hover:shadow-sm disabled:opacity-50" style={{ background: "#E8D36B", color: "#5c4a08" }}>Make Offer</button>}
               </div>
             </div>
           </div>
@@ -569,16 +608,9 @@ function SettingsSection() {
       await industryApi.updateSettings({ name, email, phone, website, location, description, contactPerson } as any);
       company.name = name; company.email = email; company.phone = phone; company.website = website; company.location = location; company.description = description; company.contactPerson = contactPerson;
       setSaved(true); setTimeout(() => setSaved(false), 2000);
-      const el = document.createElement("div"); el.className = "fixed top-4 right-4 z-50 px-4 py-3 rounded-xl text-white font-semibold text-sm shadow-lg"; el.style.background = "#244B35"; el.textContent = "Company profile saved."; document.body.appendChild(el); setTimeout(() => el.remove(), 2500);
+      toast.success("Company profile saved.");
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      const isOffline = /Cannot reach|backend unreachable|Network|Failed to fetch|Load failed/i.test(msg);
-      if (isOffline) {
-        try { localStorage.setItem("l2l.demo_company", JSON.stringify({ name, email, phone, website, location, description, contactPerson })); } catch {}
-        company.name = name; company.email = email; company.phone = phone; company.website = website; company.location = location; company.description = description; company.contactPerson = contactPerson;
-        setSaved(true); setTimeout(() => setSaved(false), 2000);
-        const el = document.createElement("div"); el.className = "fixed top-4 right-4 z-50 px-4 py-3 rounded-xl text-white font-semibold text-sm shadow-lg"; el.style.background = "#6B6F68"; el.textContent = "Saved offline (demo)."; document.body.appendChild(el); setTimeout(() => el.remove(), 2800);
-      } else { setSaveErr(msg || "Could not save."); }
+      setSaveErr(err instanceof Error ? err.message : "Could not save.");
     } finally { setSaving(false); }
   };
   const inputCls = "w-full border rounded-xl px-4 py-3 text-sm font-medium outline-none transition-colors focus:border-[#244B35]";

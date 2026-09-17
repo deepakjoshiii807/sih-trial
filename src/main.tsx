@@ -4,10 +4,6 @@ import { AuthProvider } from "@/lib/auth";
 import { registerServiceWorker } from "@/lib/pwa";
 import { VlyToolbar } from '../vly-toolbar-readonly.tsx';
 import { Component, StrictMode, type ReactNode } from "react";
-import StudentDashboard from "./pages/StudentDashboard.tsx";
-import FacultyDashboard from "./pages/FacultyDashboard.tsx";
-import IndustryDashboard from "./pages/IndustryDashboard.tsx";
-import InstitutionDashboard from "./pages/InstitutionDashboard.tsx";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Route, Routes } from "react-router";
 import "./index.css";
@@ -17,7 +13,6 @@ import LoginPage from "./pages/Login.tsx";
 import PrivacyPage from "./pages/Privacy.tsx";
 import TermsPage from "./pages/Terms.tsx";
 import RequireRole from "./components/RequireRole.tsx";
-import { DemoFrame } from "./components/ui/demo-frame.tsx";
 import SkipLink from "./components/ui/skip-link.tsx";
 import {
   LiveStudentDashboard,
@@ -48,22 +43,21 @@ createRoot(document.getElementById("root")!).render(
         <Route path="/privacy" element={<PrivacyPage />} />
         <Route path="/terms" element={<TermsPage />} />
 
-        {/* Authenticated, role-scoped dashboards (Django JWT) */}
-        {/* Trial/presentation mode: signed-out visitors get the demo build of the
-            dashboard (with DEMO PREVIEW banner) instead of a /login redirect. */}
+        {/* Authenticated, role-scoped dashboards. Every dashboard reads live
+            data from the Django API, so each route is gated by RequireRole,
+            which preserves the intended path in /login?next=... */}
         <Route
           path="/student"
           element={
-            <RequireRole role="student" demo={<DemoFrame><StudentDashboard /></DemoFrame>}>
+            <RequireRole role="student">
               <LiveStudentDashboard />
             </RequireRole>
           }
         />
-        <Route path="/student-demo" element={<DemoFrame><StudentDashboard /></DemoFrame>} />
         <Route
           path="/faculty"
           element={
-            <RequireRole role="academician" demo={<DemoFrame><FacultyDashboard /></DemoFrame>}>
+            <RequireRole role="academician">
               <LiveFacultyDashboard />
             </RequireRole>
           }
@@ -71,7 +65,7 @@ createRoot(document.getElementById("root")!).render(
         <Route
           path="/academician"
           element={
-            <RequireRole role="academician" demo={<DemoFrame><FacultyDashboard /></DemoFrame>}>
+            <RequireRole role="academician">
               <LiveFacultyDashboard />
             </RequireRole>
           }
@@ -79,7 +73,7 @@ createRoot(document.getElementById("root")!).render(
         <Route
           path="/industry"
           element={
-            <RequireRole role="industry" demo={<DemoFrame><IndustryDashboard /></DemoFrame>}>
+            <RequireRole role="industry">
               <LiveIndustryDashboard />
             </RequireRole>
           }
@@ -87,12 +81,11 @@ createRoot(document.getElementById("root")!).render(
         <Route
           path="/institution-admin"
           element={
-            <RequireRole role="institutionAdmin" demo={<DemoFrame><InstitutionDashboard /></DemoFrame>}>
+            <RequireRole role="institutionAdmin">
               <LiveInstitutionDashboard />
             </RequireRole>
           }
         />
-
         </Routes>
       </BrowserRouter>
       <ToolbarErrorBoundary>

@@ -629,6 +629,9 @@ class IndustryOpportunityListCreateView(APIView):
     @transaction.atomic
     def post(self, request):
         data = request.data
+        title = str(data.get("title") or "").strip()
+        if not title:
+            return Response({"detail": "title is required."}, status=400)
         eligibility = data.get("eligibility") or {}
         try:
             deadline = data.get("deadline") or None
@@ -638,7 +641,7 @@ class IndustryOpportunityListCreateView(APIView):
             deadline = None
         opportunity = Opportunity.objects.create(
             company=request.user,
-            title=data["title"],
+            title=title,
             type=data.get("type", "Internship"),
             description=data.get("description", ""),
             openings=int(data.get("openings", 1)),
@@ -734,6 +737,11 @@ class IndustryOpportunityDetailView(APIView):
         opportunity = self._get(request, pk)
         if opportunity is None:
             return Response({"detail": "Not found."}, status=404)
+        if opportunity.applications.exists():
+            return Response(
+                {"detail": "This listing has applicants. Close it instead of deleting."},
+                status=409,
+            )
         opportunity.delete()
         return Response(status=204)
 

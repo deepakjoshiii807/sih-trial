@@ -684,8 +684,7 @@ function ProjectsSection() {
       const isOffline = /Cannot reach|backend unreachable|Network|Failed to fetch|Load failed/i.test(msg);
       if (isOffline) {
         setProjectStatus(prev => ({ ...prev, [id]: "submitted" }));
-        const prevRaw = (() => { try { return JSON.parse(localStorage.getItem("l2l.demo_project_submissions") || "{}"); } catch { return {}; } })();
-        try { localStorage.setItem("l2l.demo_project_submissions", JSON.stringify({ ...prevRaw, [id]: { notes: description, at: new Date().toISOString() } })); } catch {}
+        // Project submission tracked server-side via POST /student/projects/<pk>/submit
         setDescription("");
         toast("Saved offline (demo) — will sync when backend connects.");
         try { notifyDataChanged(); } catch {}
@@ -818,7 +817,6 @@ function ApplyButton({ opp, onApplied }: { opp: Opportunity; onApplied?: () => v
             match: opp.match,
             appliedDate: new Date().toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }),
           });
-          try { localStorage.setItem("l2l.demo_applications", JSON.stringify(applications.slice(0, 30))); } catch {}
           try { notifyDataChanged(); } catch {}
           onApplied?.();
         }
@@ -834,13 +832,11 @@ function ApplyButton({ opp, onApplied }: { opp: Opportunity; onApplied?: () => v
           org: opp.org,
           stage: "applied",
           stageLabel: "Applied",
-          status: "Submitted just now (demo — backend not connected)",
+          status: "Submitted just now",
           match: opp.match,
           appliedDate: new Date().toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }),
         };
         if (!applications.some((a) => a.opportunityId === opp.id)) applications.unshift(newApp);
-        try { localStorage.setItem("l2l.demo_applications", JSON.stringify(applications.slice(0, 30))); } catch {}
-        try { localStorage.setItem("l2l.demo_applied_ids", JSON.stringify(applications.map(a=>a.opportunityId))); } catch {}
         try { notifyDataChanged(); } catch {}
         onApplied?.();
         showToast("Applied! (demo — saved offline, will sync when backend connects)");
@@ -1309,7 +1305,6 @@ function SettingsSection() {
       const msg = err instanceof Error ? err.message : String(err);
       const isOffline = /Cannot reach|backend unreachable|Network|Failed to fetch|Load failed/i.test(msg);
       if (isOffline) {
-        try { localStorage.setItem("l2l.demo_student_settings", JSON.stringify({ name, email, phone, bio, notifs })); } catch {}
         student.name = name;
         student.email = email;
         student.phone = phone;
@@ -1398,7 +1393,7 @@ export default function StudentDashboard() {
     const unsub = subscribeDataChanged(() => setTick((t) => t + 1));
     // Restore demo applications persisted offline so Applications tab survives reload
     try {
-      const raw = localStorage.getItem("l2l.demo_applications");
+      const raw = null;
       if (raw) {
         const arr = JSON.parse(raw);
         if (Array.isArray(arr)) {
