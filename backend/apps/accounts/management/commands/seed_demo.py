@@ -34,6 +34,7 @@ from apps.catalog.models import (
     TargetRole,
     TargetRoleSkill,
 )
+from apps.catalog.scholarship_models import Scholarship
 from apps.credentials.models import (
     EvidenceItem,
     ProjectRecommendation,
@@ -543,6 +544,25 @@ def seed_all(force: bool = False, password: str = DEMO_PASSWORD) -> dict:
              "Builds the writing skills your target role lists as required.")
     resource("Workshop", "GCP & Clinical Trial Basics", "AIIA", "2 days", 4.7, "TC-CT-05", 23,
              "Hands-on practice with case report forms and trial records.", "Good Clinical Practice workshop.")
+
+    # Scholarships — grounded catalog (never hallucinated; matched deterministically
+    # to course/skills, with optional LLM ranking client-side)
+    _scholarships = [
+        ("AYUSH National Scholarship", "Ministry of Ayush", "AYUSH", "₹25,000/year", "Merit + need; BAMS/BHMS/BUMS students", ["BAMS", "BHMS", "BUMS"], ["Ayurvedic Therapeutics"], "https://ayush.gov.in"),
+        ("CCRAS Junior Research Fellowship", "CCRAS", "Research", "₹31,000/month + HRA", "BAMS/MSc + research aptitude", ["BAMS", "MSc", "BSc"], ["Research Methodology", "Clinical Research"], "https://ccras.nic.in"),
+        ("ICMR-STS Studentship", "ICMR", "Research", "₹25,000 (short-term)", "MBBS/BAMS students doing STS project", ["BAMS", "MBBS", "BSc"], ["Research Methodology", "Data Analysis"], "https://icmr.nic.in"),
+        ("INSPIRE Scholarship", "DST, Govt. of India", "Merit", "₹80,000/year", "Top 1% in 12th / BSc top performers", ["BSc", "MSc", "BAMS"], [], "https://inspire-dst.gov.in"),
+        ("National Means-cum-Merit Scholarship", "MHRD", "General", "₹12,000/year", "Family income < ₹3.5 lakh", [], [], "https://scholarships.gov.in"),
+        ("AIIMS Research Internship Stipend", "AIIMS Delhi", "Health", "₹15,000/month", "Clinical research internships", ["BAMS", "MBBS", "BSc"], ["Clinical Research", "Data Analysis"], "https://aiims.edu"),
+    ]
+    for title, provider, cat, amount, eligibility, courses, skills, url in _scholarships:
+        Scholarship.objects.get_or_create(
+            title=title, provider=provider,
+            defaults={
+                "category": cat, "amount": amount, "eligibility": eligibility,
+                "eligible_courses": courses, "relevant_skills": skills, "url": url, "is_active": True,
+            },
+        )
 
     stat_skill = Skill.objects.get(taxonomy_id="TC-SA-01")
     writing_skill = Skill.objects.get(taxonomy_id="TC-SW-02")

@@ -1,6 +1,7 @@
+import * as React from "react";
 import { useEffect, useState } from "react";
 import { DashboardError, DashboardLoader } from "@/components/ui/dashboard-state"; // P1
-import { subscribeDataChanged } from "@/lib/data-events";
+import { subscribeDataChanged, notifyDataChanged } from "@/lib/data-events";
 import { SignOutButton } from "@/components/ui/sign-out-button";
 import { Sidebar, SidebarBody, Logo, LogoIcon, useSidebar } from "@/components/ui/sidebar";
 import { motion, AnimatePresence } from "framer-motion";
@@ -11,9 +12,22 @@ import {
   Calendar, MapPin, Clock, ExternalLink, Edit3, Camera,
   Lock, Globe, Eye, EyeOff, Mail, Key, BellRing, Trash2,
   Save, Download, Smartphone, Lightbulb, FlaskConical, Link2,
-  Share2, Copy, Sparkles,
+  Share2, Copy, Sparkles, Video, Printer,
 } from "lucide-react";
+import { RadarChart, PolarGrid, PolarAngleAxis, Radar, ResponsiveContainer, Tooltip } from "recharts";
 
+import EmptyState from "@/components/ui/empty-state";
+import MobileTabBar from "@/components/ui/mobile-tab-bar";
+import OnboardingWizard, { ONBOARDING_ROLES } from "@/components/ui/onboarding-wizard";
+import ReadinessReportModal from "@/components/ui/readiness-report";
+
+import SkillExtractionModal from "@/components/ui/skill-extraction-modal";
+import EvidenceUploadModal from "@/components/ui/evidence-upload-modal";
+import MockInterviewModal from "@/components/ui/mock-interview-modal";
+import ProfileOptimizerPanel from "@/components/ui/profile-optimizer-panel";
+import ScholarshipPanel from "@/components/ui/scholarship-panel";
+import { enrichOpportunityMatch, type EnrichedMatch } from "@/lib/ai-opportunity-matcher";
+import { ModelDisclaimer } from "@/components/ui/ai-provenance";
 import type {
   Student, SkillPassportItem, SkillGap, RoleReadinessProfile,
   SimulatorAction, RecommendedProject, Opportunity, Application,
@@ -71,6 +85,7 @@ let applications: Application[] = [
   { id: "ap-1", opportunityId: "op-1", role: "Clinical Research Intern", org: "AIIA Research Division", stage: "shortlisted", stageLabel: "Shortlisted", status: "Interview scheduled", nextStep: "Interview: Sept 10", match: 92, appliedDate: "Sept 3, 2025" },
   { id: "ap-2", opportunityId: "op-2", role: "Research Data Assistant", org: "CCRAS", stage: "interviewed", stageLabel: "Interviewed", status: "Awaiting decision", match: 88, appliedDate: "Aug 25, 2025" },
   { id: "ap-3", opportunityId: "op-3", role: "AYUSH Research Internship", org: "NIA Jaipur", stage: "applied", stageLabel: "Applied", status: "Submitted 2 days ago", match: 78, appliedDate: "Sept 4, 2025" },
+  { id: "ap-4", opportunityId: "op-4", role: "Clinical Data Management Intern", org: "AIIA / Research Division", stage: "joined", stageLabel: "Joined", status: "Internship completed — Aug 2025", nextStep: "Completed 3-month internship", match: 84, appliedDate: "Jun 10, 2025", employerUserId: 9, rateable: true, rated: false },
 ];
 
 let recommendations: LearningRecommendation[] = [
@@ -110,6 +125,8 @@ const navLinks = [
   { id: "applications", label: "Applications", icon: <FileText size={18} /> },
   { id: "recommendations", label: "Learn", icon: <BookOpen size={18} /> },
   { id: "portfolio", label: "Portfolio", icon: <Grid3X3 size={18} /> },
+  { id: "scholarships", label: "Scholarships", icon: <Award size={18} /> },
+  { id: "optimizer", label: "AI Optimizer", icon: <Sparkles size={18} /> },
 ];
 
 /* ─── Helpers ─── */
@@ -124,14 +141,23 @@ function LinkMore({ onClick, children }: { onClick?: () => void; children: React
 
 /* ─── Sidebar ─── */
 function SidebarContent({ activeNav, setActiveNav }: { activeNav: string; setActiveNav: (id: string) => void }) {
-  const { open } = useSidebar();
+  const { open, setOpen } = useSidebar();
+
+  /** Switch section and (on phones) close the drawer. */
+  const goTo = (id: string) => {
+    setActiveNav(id);
+    if (typeof window !== "undefined" && window.matchMedia("(max-width: 767px)").matches) {
+      setOpen(false);
+    }
+  };
+
   return (
     <>
       <div className="flex flex-col flex-1 overflow-y-auto overflow-x-hidden">
         <div className={open ? "" : "flex justify-center"}>{open ? <Logo /> : <LogoIcon />}</div>
         <div className="mt-8 flex flex-col gap-[2px]">
           {navLinks.map((link) => (
-            <button key={link.id} onClick={() => setActiveNav(link.id)} className={`flex items-center gap-3 w-full text-left rounded-xl text-sm font-medium transition-colors ${open ? "px-3 py-2.5" : "px-0 py-2.5 justify-center"} ${activeNav === link.id ? "bg-[#244B35] text-white font-semibold" : "text-[#6B6F68] hover:bg-[#EDEBE0] hover:text-[#171A18]"}`}>
+            <button key={link.id} onClick={() => goTo(link.id)} className={`flex items-center gap-3 w-full text-left rounded-xl text-sm font-medium transition-colors ${open ? "px-3 py-2.5" : "px-0 py-2.5 justify-center"} ${activeNav === link.id ? "bg-[#244B35] text-white font-semibold" : "text-[#6B6F68] hover:bg-[#EDEBE0] hover:text-[#171A18]"}`}>
               <span className="flex-shrink-0 flex items-center justify-center" style={{ width: 18, height: 18 }}>{link.icon}</span>
               {open && <span className="text-sm whitespace-pre">{link.label}</span>}
               {open && link.count !== undefined && <span className={`ml-auto font-mono text-[10px] px-1.5 py-0.5 rounded-md ${activeNav === link.id ? "bg-white/20 text-white" : "bg-[#EDEBE0] text-[#6B6F68]"}`}>{link.count}</span>}
@@ -140,7 +166,7 @@ function SidebarContent({ activeNav, setActiveNav }: { activeNav: string; setAct
         </div>
       </div>
       <div className="border-t pt-3 mt-2" style={{ borderColor: open ? "#E6E3D7" : "transparent" }}>
-        <button onClick={() => setActiveNav("settings")} className={`flex items-center gap-3 w-full rounded-xl text-[#6B6F68] text-xs font-medium hover:bg-[#EDEBE0] hover:text-[#171A18] transition-colors ${open ? "px-3 py-2" : "px-0 py-2 justify-center"}`}><Settings size={16} /> {open && "Settings"}</button>
+        <button onClick={() => goTo("settings")} className={`flex items-center gap-3 w-full rounded-xl text-[#6B6F68] text-xs font-medium hover:bg-[#EDEBE0] hover:text-[#171A18] transition-colors ${open ? "px-3 py-2" : "px-0 py-2 justify-center"}`}><Settings size={16} /> {open && "Settings"}</button>
         <SignOutButton open={open} />
         {open && <div className="mt-3 p-3 rounded-xl border" style={{ background: "#F7F6F0", borderColor: "#E6E3D7" }}><div className="flex items-center gap-2.5"><div className="w-9 h-9 rounded-lg flex items-center justify-center font-bold text-xs flex-shrink-0" style={{ background: "#244B35", color: "#DCE6D0" }}>{student.initials}</div><div className="min-w-0"><div className="font-semibold text-sm truncate" style={{ color: "#171A18" }}>{student.name}</div><div className="text-[11px] font-mono" style={{ color: "#6B6F68" }}>{student.course} / {student.year}</div></div></div><div className="mt-2.5"><div className="flex justify-between text-xs mb-1 font-mono" style={{ color: "#6B6F68" }}><span>Profile {student.profileCompletion}%</span></div><div className="h-1.5 rounded-full overflow-hidden" style={{ background: "#E6E3D7" }}><div className="h-full rounded-full" style={{ width: `${student.profileCompletion}%`, background: "#244B35" }} /></div></div></div>}
         {!open && <div className="flex justify-center mt-3"><div className="w-9 h-9 rounded-lg flex items-center justify-center font-bold text-xs" style={{ background: "#244B35", color: "#DCE6D0" }}>{student.initials}</div></div>}
@@ -152,7 +178,7 @@ function SidebarContent({ activeNav, setActiveNav }: { activeNav: string; setAct
 /* ═══════════════════════════════════════════════════════
    OVERVIEW SECTION
    ═══════════════════════════════════════════════════════ */
-function OverviewSection() {
+function OverviewSection({ onExtractSkills, onUploadEvidence, onNavigate }: { onExtractSkills?: () => void; onUploadEvidence?: () => void; onNavigate?: (id: string) => void } = {}) {
   const [animateRing, setAnimateRing] = useState(0);
   useEffect(() => { let f = 0; const id = setInterval(() => { f += 2; setAnimateRing(Math.min(f, student.profileCompletion)); if (f >= student.profileCompletion) clearInterval(id); }, 12); return () => clearInterval(id); }, []);
 
@@ -162,6 +188,9 @@ function OverviewSection() {
   ];
 
   const bestMatch = opportunities[0]; // P149
+
+  // Radar data — top skills by confidence for the readiness radar chart.
+  const radarData = skillPassport.items.slice(0, 7).map((s) => ({ skill: s.name.length > 14 ? s.name.slice(0, 13) + "…" : s.name, confidence: s.confidence, fullMark: 100 }));
 
   return (
     <div className="flex flex-col gap-5">
@@ -227,7 +256,7 @@ function OverviewSection() {
       {/* Skill Snapshot + Skill Gap */}
       <div className="grid grid-cols-1 md:grid-cols-12 gap-5">
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1, duration: 0.4 }}
-          className="md:col-span-7 rounded-[18px] border p-6 bg-white relative overflow-hidden" style={{ borderColor: "#D6E3CE", boxShadow: "0 1px 3px rgba(0,0,0,.04)" }}>
+          className="md:col-span-7 rounded-[18px] border p-5 md:p-6 bg-white relative overflow-hidden" style={{ borderColor: "#D6E3CE", boxShadow: "0 1px 3px rgba(0,0,0,.04)" }}>
           <div className="absolute top-0 left-0 w-full h-1" style={{ background: "linear-gradient(90deg, #244B35, #DCE6D0)" }} />
           <Eyebrow color="#244B35">Skill Snapshot</Eyebrow>
           <div className="font-semibold text-[19px] tracking-tight mt-2 mb-4">Your Skill Snapshot</div>
@@ -248,7 +277,7 @@ function OverviewSection() {
         </motion.div>
 
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2, duration: 0.4 }}
-          className="md:col-span-5 rounded-[18px] border p-6 bg-white relative overflow-hidden" style={{ borderColor: "#E6DDD5", boxShadow: "0 1px 3px rgba(0,0,0,.04)" }}>
+          className="md:col-span-5 rounded-[18px] border p-5 md:p-6 bg-white relative overflow-hidden" style={{ borderColor: "#E6DDD5", boxShadow: "0 1px 3px rgba(0,0,0,.04)" }}>
           <div className="absolute top-0 left-0 w-full h-1" style={{ background: "linear-gradient(90deg, #E8C7AE, #F0E8DD)" }} />
           <Eyebrow color="#E8C7AE">Skill Gap</Eyebrow>
           <div className="font-semibold text-[19px] tracking-tight mt-2 mb-1">Your Biggest Skill Gaps</div>
@@ -267,9 +296,32 @@ function OverviewSection() {
         </motion.div>
       </div>
 
+      {/* Readiness Radar */}
+      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25, duration: 0.4 }}
+        className="rounded-[18px] border p-5 md:p-6 bg-white relative overflow-hidden" style={{ borderColor: "#D6E3CE", boxShadow: "0 1px 3px rgba(0,0,0,.04)" }}>
+        <div className="absolute top-0 left-0 w-full h-1" style={{ background: "linear-gradient(90deg, #244B35, #8A6FB8)" }} />
+        <div className="flex flex-col lg:flex-row lg:items-center gap-2 lg:gap-6">
+          <div className="flex-1 min-w-0">
+            <Eyebrow color="#244B35">Readiness Radar</Eyebrow>
+            <div className="font-semibold text-[19px] tracking-tight mt-2 mb-1">Your Skill Readiness Radar</div>
+            <p className="text-xs" style={{ color: "#6B6F68" }}>Confidence across your top skills — balanced profiles match more roles.</p>
+          </div>
+          <div className="w-full lg:w-[360px] h-[240px] flex-shrink-0" role="img" aria-label="Skill confidence radar chart">
+            <ResponsiveContainer width="100%" height="100%">
+              <RadarChart data={radarData} cx="50%" cy="50%" outerRadius="72%">
+                <PolarGrid />
+                <PolarAngleAxis dataKey="skill" tick={{ fontSize: 11, fill: "#6B6F68" }} />
+                <Radar dataKey="confidence" stroke="#244B35" fill="#244B35" fillOpacity={0.35} />
+                <Tooltip />
+              </RadarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      </motion.div>
+
       {/* Best Match */}
       <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3, duration: 0.4 }}
-        className="rounded-[18px] border p-6 bg-white relative overflow-hidden" style={{ borderColor: "#E6DDD5", boxShadow: "0 2px 8px rgba(0,0,0,.04)" }}>
+        className="rounded-[18px] border p-5 md:p-6 bg-white relative overflow-hidden" style={{ borderColor: "#E6DDD5", boxShadow: "0 2px 8px rgba(0,0,0,.04)" }}>
         <div className="absolute top-0 left-0 w-full h-1" style={{ background: "linear-gradient(90deg, #C98B5F, #E8D36B)" }} />
         <Eyebrow color="#C98B5F">Best Match For You</Eyebrow>
         <div className="flex flex-col md:flex-row gap-6 mt-3">
@@ -290,8 +342,8 @@ function OverviewSection() {
             </div>
             <p className="text-xs mb-3" style={{ color: "#6B6F68" }}>{bestMatch.match}% match because your profile strongly aligns with {bestMatch.matchedSkills.length} of {bestMatch.requiredSkills.length} required skills.</p>
             <div className="flex gap-3">
-              <button className="font-mono text-xs font-bold px-4 py-2 rounded-lg text-white transition-all hover:shadow-md hover:scale-[1.02]" style={{ background: "linear-gradient(135deg, #244B35, #1C3D2B)" }}>View opportunity</button>
-              <button className="font-mono text-xs font-bold px-4 py-2 rounded-lg border transition-all hover:shadow-sm hover:bg-[#FAFAF7]" style={{ borderColor: "#E6E3D7", color: "#6B6F68" }}>See all opportunities</button>
+              <button onClick={() => onNavigate?.("opportunities")} className="font-mono text-xs font-bold px-4 py-2 rounded-lg text-white transition-all hover:shadow-md hover:scale-[1.02]" style={{ background: "linear-gradient(135deg, #244B35, #1C3D2B)" }}>View opportunity</button>
+              <button onClick={() => onNavigate?.("opportunities")} className="font-mono text-xs font-bold px-4 py-2 rounded-lg border transition-all hover:shadow-sm hover:bg-[#FAFAF7]" style={{ borderColor: "#E6E3D7", color: "#6B6F68" }}>See all opportunities</button>
             </div>
           </div>
         </div>
@@ -299,7 +351,7 @@ function OverviewSection() {
 
       {/* Applications */}
       <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35, duration: 0.4 }}
-        className="rounded-[18px] border p-6 bg-white relative overflow-hidden" style={{ borderColor: "#DED6EC", boxShadow: "0 1px 3px rgba(0,0,0,.04)" }}>
+        className="rounded-[18px] border p-5 md:p-6 bg-white relative overflow-hidden" style={{ borderColor: "#DED6EC", boxShadow: "0 1px 3px rgba(0,0,0,.04)" }}>
         <div className="absolute top-0 left-0 w-full h-1" style={{ background: "linear-gradient(90deg, #8A6FB8, #C8B5DE)" }} />
         <Eyebrow color="#8A6FB8">Application Journey</Eyebrow>
         <div className="font-semibold text-[19px] tracking-tight mt-2 mb-4">Application Journey</div>
@@ -318,7 +370,7 @@ function OverviewSection() {
 
       {/* Recommendations */}
       <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4, duration: 0.4 }}
-        className="rounded-[18px] border p-6 bg-white relative overflow-hidden" style={{ borderColor: "#DED6EC", boxShadow: "0 1px 3px rgba(0,0,0,.04)" }}>
+        className="rounded-[18px] border p-5 md:p-6 bg-white relative overflow-hidden" style={{ borderColor: "#DED6EC", boxShadow: "0 1px 3px rgba(0,0,0,.04)" }}>
         <div className="absolute top-0 left-0 w-full h-1" style={{ background: "linear-gradient(90deg, #C8B5DE, #EAE3F4)" }} />
         <Eyebrow color="#8A6FB8">Recommendations</Eyebrow>
         <div className="font-semibold text-[19px] tracking-tight mt-2 mb-0.5">Recommended For Your Skill Gaps</div>
@@ -338,18 +390,18 @@ function OverviewSection() {
 
       {/* Quick Actions */}
       <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.45, duration: 0.4 }}
-        className="rounded-[18px] border p-6 bg-white relative overflow-hidden" style={{ borderColor: "#E6E3D7", boxShadow: "0 1px 3px rgba(0,0,0,.04)" }}>
+        className="rounded-[18px] border p-5 md:p-6 bg-white relative overflow-hidden" style={{ borderColor: "#E6E3D7", boxShadow: "0 1px 3px rgba(0,0,0,.04)" }}>
         <div className="absolute top-0 left-0 w-full h-1" style={{ background: "linear-gradient(90deg, #244B35, #E8D36B, #C98B5F, #8A6FB8)" }} />
         <Eyebrow>Quick Actions</Eyebrow>
         <div className="font-semibold text-[19px] tracking-tight mt-2 mb-4">What do you want to do?</div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {[
-            { icon: <Upload size={16} />, label: "Upload Evidence", color: "#244B35" },
-            { icon: <Briefcase size={16} />, label: "Explore Opportunities", color: "#C98B5F" },
-            { icon: <Zap size={16} />, label: "Check Skill Gaps", color: "#E8D36B" },
-            { icon: <UserCog size={16} />, label: "Update Profile", color: "#8A6FB8" },
+            { icon: <Sparkles size={16} />, label: "AI Extract Skills", color: "#244B35", onClick: () => onExtractSkills?.() },
+            { icon: <Upload size={16} />, label: "Upload Evidence", color: "#6B6F68", onClick: () => onUploadEvidence?.() },
+            { icon: <Briefcase size={16} />, label: "Explore Opportunities", color: "#C98B5F", onClick: () => onNavigate?.("opportunities") },
+            { icon: <UserCog size={16} />, label: "Update Profile", color: "#8A6FB8", onClick: () => onNavigate?.("profile") },
           ].map((a) => (
-            <button key={a.label} className="flex flex-col items-center gap-2 rounded-xl border p-4 text-center transition-all hover:shadow-md hover:-translate-y-0.5" style={{ borderColor: "#E6E3D7", background: "#FAFAF7" }}>
+            <button key={a.label} onClick={(a as any).onClick} className="flex flex-col items-center gap-2 rounded-xl border p-4 text-center transition-all hover:shadow-md hover:-translate-y-0.5" style={{ borderColor: "#E6E3D7", background: "#FAFAF7" }}>
               <div className="w-9 h-9 rounded-lg flex items-center justify-center transition-transform group-hover:scale-110" style={{ background: a.color + "15", color: a.color }}>{a.icon}</div>
               <span className="text-xs font-semibold" style={{ color: "#171A18" }}>{a.label}</span>
             </button>
@@ -363,10 +415,10 @@ function OverviewSection() {
 /* ═══════════════════════════════════════════════════════
    PROFILE SECTION // P350
    ═══════════════════════════════════════════════════════ */
-function ProfileSection() {
+function ProfileSection({ onNavigate }: { onNavigate?: (id:string)=>void } = {}) {
   return (
     <div className="flex flex-col gap-5">
-      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="rounded-[18px] border p-6 bg-white" style={{ borderColor: "#E6E3D7", boxShadow: "0 1px 3px rgba(0,0,0,.04)" }}>
+      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="rounded-[18px] border p-5 md:p-6 bg-white" style={{ borderColor: "#E6E3D7", boxShadow: "0 1px 3px rgba(0,0,0,.04)" }}>
         <div className="flex flex-col md:flex-row gap-6">
           <div className="w-20 h-20 rounded-xl flex items-center justify-center font-bold text-xl flex-shrink-0" style={{ background: "linear-gradient(135deg, #244B35, #1C3D2B)", color: "#DCE6D0", boxShadow: "0 4px 12px rgba(36,75,53,.15)" }}>{student.initials}</div>
           <div className="flex-1">
@@ -375,12 +427,12 @@ function ProfileSection() {
             <div className="text-xs mb-3" style={{ color: "#6B6F68" }}>{student.institution}</div>
             <Tag cls="verified">Target: {student.targetRole}</Tag>
           </div>
-          <div className="flex-shrink-0"><button className="font-mono text-xs font-bold px-4 py-2 rounded-lg border flex items-center gap-2" style={{ borderColor: "#E6E3D7", color: "#6B6F68" }}><Edit3 size={13} /> Edit</button></div>
+          <div className="flex-shrink-0"><button onClick={() => onNavigate?.("settings")} className="font-mono text-xs font-bold px-4 py-2 rounded-lg border flex items-center gap-2 hover:bg-[#FAFAF7] transition-colors" style={{ borderColor: "#E6E3D7", color: "#6B6F68" }}><Edit3 size={13} /> Edit</button></div>
         </div>
       </motion.div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="md:col-span-2 rounded-[18px] border p-6 bg-white" style={{ borderColor: "#E6E3D7", boxShadow: "0 1px 3px rgba(0,0,0,.04)" }}>
+        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="md:col-span-2 rounded-[18px] border p-5 md:p-6 bg-white" style={{ borderColor: "#E6E3D7", boxShadow: "0 1px 3px rgba(0,0,0,.04)" }}>
           <Eyebrow>Contact Information</Eyebrow>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-3">
             {[
@@ -399,7 +451,7 @@ function ProfileSection() {
           </div>
         </motion.div>
 
-        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="rounded-[18px] border p-6 bg-white" style={{ borderColor: "#E6E3D7", boxShadow: "0 1px 3px rgba(0,0,0,.04)" }}>
+        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="rounded-[18px] border p-5 md:p-6 bg-white" style={{ borderColor: "#E6E3D7", boxShadow: "0 1px 3px rgba(0,0,0,.04)" }}>
           <Eyebrow>Quick Stats</Eyebrow>
           <div className="flex flex-col gap-3 mt-3">
             {[
@@ -429,7 +481,7 @@ function SkillPassportSection() {
 
   return (
     <div className="flex flex-col gap-5">
-      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="rounded-[18px] border p-6 bg-white" style={{ borderColor: "#E6E3D7", boxShadow: "0 1px 3px rgba(0,0,0,.04)" }}>
+      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="rounded-[18px] border p-5 md:p-6 bg-white" style={{ borderColor: "#E6E3D7", boxShadow: "0 1px 3px rgba(0,0,0,.04)" }}>
         <div className="absolute top-0 left-0 w-full h-1" style={{ background: "linear-gradient(90deg, #244B35, #DCE6D0)" }} />
         <Eyebrow color="#244B35">Skill Passport</Eyebrow>
         <div className="font-semibold text-[22px] tracking-tight mt-2 mb-1">Your Skill Passport</div>
@@ -450,7 +502,7 @@ function SkillPassportSection() {
       </motion.div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="rounded-[18px] border p-6 bg-white" style={{ borderColor: "#E6E3D7", boxShadow: "0 1px 3px rgba(0,0,0,.04)" }}>
+        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="rounded-[18px] border p-5 md:p-6 bg-white" style={{ borderColor: "#E6E3D7", boxShadow: "0 1px 3px rgba(0,0,0,.04)" }}>
           <div className="flex items-center gap-2 mb-4"><div className="w-3 h-3 rounded-sm" style={{ background: "#244B35" }} /><div className="font-semibold text-[16px]" style={{ color: "#171A18" }}>Evidence-Derived Skills</div></div>
           <div className="flex flex-col gap-3">
             {verified.map((sk) => (
@@ -466,7 +518,7 @@ function SkillPassportSection() {
           </div>
         </motion.div>
 
-        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="rounded-[18px] border p-6 bg-white" style={{ borderColor: "#E6E3D7", boxShadow: "0 1px 3px rgba(0,0,0,.04)" }}>
+        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="rounded-[18px] border p-5 md:p-6 bg-white" style={{ borderColor: "#E6E3D7", boxShadow: "0 1px 3px rgba(0,0,0,.04)" }}>
           <div className="flex items-center gap-2 mb-4"><div className="w-3 h-3 rounded-sm" style={{ background: "#E8D36B" }} /><div className="font-semibold text-[16px]" style={{ color: "#171A18" }}>Self-Declared Skills</div></div>
           <div className="flex flex-col gap-3">
             {selfDeclared.map((sk) => (
@@ -483,7 +535,7 @@ function SkillPassportSection() {
         </motion.div>
       </div>
 
-      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="rounded-[18px] border p-6 bg-white" style={{ borderColor: "#E6E3D7", boxShadow: "0 1px 3px rgba(0,0,0,.04)" }}>
+      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="rounded-[18px] border p-5 md:p-6 bg-white" style={{ borderColor: "#E6E3D7", boxShadow: "0 1px 3px rgba(0,0,0,.04)" }}>
         <div className="absolute top-0 left-0 w-full h-1" style={{ background: "linear-gradient(90deg, #8A6FB8, #C8B5DE)" }} />
         <Eyebrow color="#8A6FB8">Role Readiness</Eyebrow>
         <div className="font-semibold text-[19px] tracking-tight mt-2 mb-1">Role Readiness: {roleReadiness.targetRole}</div>
@@ -509,10 +561,10 @@ function SkillPassportSection() {
 /* ═══════════════════════════════════════════════════════
    SKILL GAP SECTION
    ═══════════════════════════════════════════════════════ */
-function SkillGapSection() {
+function SkillGapSection({ onNavigate }: { onNavigate?: (id:string)=>void } = {}) {
   return (
     <div className="flex flex-col gap-5">
-      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="rounded-[18px] border p-6 bg-white" style={{ borderColor: "#E6E3D7", boxShadow: "0 1px 3px rgba(0,0,0,.04)" }}>
+      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="rounded-[18px] border p-5 md:p-6 bg-white" style={{ borderColor: "#E6E3D7", boxShadow: "0 1px 3px rgba(0,0,0,.04)" }}>
         <div className="absolute top-0 left-0 w-full h-1" style={{ background: "linear-gradient(90deg, #E8C7AE, #F0E8DD)" }} />
         <Eyebrow color="#E8C7AE">Skill Gap Analysis</Eyebrow>
         <div className="font-semibold text-[22px] tracking-tight mt-2 mb-1">Your Skill Gaps</div>
@@ -533,7 +585,7 @@ function SkillGapSection() {
                 <div className="h-2 rounded-full overflow-hidden" style={{ background: "#E6E3D7" }}><div className="h-full rounded-full" style={{ width: `${g.required}%`, background: "#244B35" }} /></div>
               </div>
               {g.evidenceNeeded && <div className="font-mono text-[10px] font-bold px-2 py-0.5 rounded-md inline-block" style={{ background: "#F0E8DD", color: "#7a3f1a" }}>Evidence needed</div>}
-              <button className="mt-3 font-mono text-xs font-bold text-[#244B35] inline-flex items-center gap-1.5 hover:gap-3 transition-all px-3 py-1.5 rounded-lg hover:bg-[#F0F5EC]">Close gap <ChevronRight size={12} /></button>
+              <button onClick={() => onNavigate?.("projects")} className="mt-3 font-mono text-xs font-bold text-[#244B35] inline-flex items-center gap-1.5 hover:gap-3 transition-all px-3 py-1.5 rounded-lg hover:bg-[#F0F5EC]">Close gap <ChevronRight size={12} /></button>
             </div>
           ))}
         </div>
@@ -551,7 +603,7 @@ function SimulatorSection() {
 
   return (
     <div className="flex flex-col gap-5">
-      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="rounded-[18px] border p-6 bg-white" style={{ borderColor: "#E6E3D7", boxShadow: "0 1px 3px rgba(0,0,0,.04)" }}>
+      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="rounded-[18px] border p-5 md:p-6 bg-white" style={{ borderColor: "#E6E3D7", boxShadow: "0 1px 3px rgba(0,0,0,.04)" }}>
         <div className="absolute top-0 left-0 w-full h-1" style={{ background: "linear-gradient(90deg, #8A6FB8, #C8B5DE)" }} />
         <Eyebrow color="#8A6FB8">Skill Gap Simulator</Eyebrow>
         <div className="font-semibold text-[22px] tracking-tight mt-2 mb-1">See What Could Change</div>
@@ -606,18 +658,43 @@ function ProjectsSection() {
   const [projectStatus, setProjectStatus] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState<string | null>(null);
   const [description, setDescription] = useState("");
-
+  const toast = (msg: string, bg = "#244B35") => {
+    const el = document.createElement("div");
+    el.className = "fixed top-4 right-4 z-50 px-4 py-3 rounded-xl text-white font-semibold text-sm shadow-lg max-w-[90vw]";
+    el.style.background = bg;
+    el.textContent = msg;
+    document.body.appendChild(el);
+    setTimeout(() => { el.style.opacity = "0"; el.style.transition = "opacity .3s"; setTimeout(() => el.remove(), 300); }, 3000);
+  };
   const handleStart = (id: string) => {
     setProjectStatus(prev => ({ ...prev, [id]: "in-progress" }));
+    toast("Project started — add notes and submit when ready.");
   };
-
-  const handleSubmit = (id: string) => {
+  const handleSubmit = async (id: string) => {
+    if (!description.trim()) { toast("Add a short note describing your work.", "#7a3f1a"); return; }
     setSubmitting(id);
-    setTimeout(() => {
+    try {
+      await studentApi.submitProject(id, { notes: description });
       setProjectStatus(prev => ({ ...prev, [id]: "submitted" }));
-      setSubmitting(null);
       setDescription("");
-    }, 1500);
+      toast("Submitted for review! Your academician will verify it.");
+      try { notifyDataChanged(); } catch {}
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      const isOffline = /Cannot reach|backend unreachable|Network|Failed to fetch|Load failed/i.test(msg);
+      if (isOffline) {
+        setProjectStatus(prev => ({ ...prev, [id]: "submitted" }));
+        const prevRaw = (() => { try { return JSON.parse(localStorage.getItem("l2l.demo_project_submissions") || "{}"); } catch { return {}; } })();
+        try { localStorage.setItem("l2l.demo_project_submissions", JSON.stringify({ ...prevRaw, [id]: { notes: description, at: new Date().toISOString() } })); } catch {}
+        setDescription("");
+        toast("Saved offline (demo) — will sync when backend connects.");
+        try { notifyDataChanged(); } catch {}
+      } else {
+        toast(msg || "Could not submit. Try again.", "#7a3f1a");
+      }
+    } finally {
+      setSubmitting(null);
+    }
   };
 
   const statusLabel = (id: string) => {
@@ -672,7 +749,7 @@ function ProjectsSection() {
                   <div className="font-mono text-[10px] font-bold tracking-widest uppercase mb-2" style={{ color: "#9A9D94" }}>Submit Evidence</div>
                   <textarea className="w-full rounded-lg border px-3 py-2 text-sm outline-none mb-2" style={{ borderColor: "#E6E3D7", background: "#fff", color: "#171A18", minHeight: 60 }} placeholder="Describe your project and upload files..." value={description} onChange={e => setDescription(e.target.value)} />
                   <div className="flex items-center gap-2 mb-2">
-                    <button className="flex items-center gap-1.5 text-[11px] font-medium px-3 py-1.5 rounded-lg border transition-all hover:bg-[#F0F5EC]" style={{ borderColor: "#E6E3D7", color: "#6B6F68" }}><Upload size={12} /> Upload files</button>
+                    <button onClick={() => { const inp=document.createElement("input"); inp.type="file"; inp.accept=".pdf,.txt,.md,.png,.jpg,.zip"; inp.onchange=(e)=>{ const f=(e.target as HTMLInputElement).files?.[0]; if(f){ const el=document.createElement("div"); el.className="fixed top-4 right-4 z-50 px-4 py-3 rounded-xl text-white font-semibold text-sm shadow-lg"; el.style.background="#244B35"; el.textContent=`Attached ${f.name} — include it in your submission notes`; document.body.appendChild(el); setTimeout(()=>el.remove(),2500); } }; inp.click(); }} className="flex items-center gap-1.5 text-[11px] font-medium px-3 py-1.5 rounded-lg border transition-all hover:bg-[#F0F5EC]" style={{ borderColor: "#E6E3D7", color: "#6B6F68" }}><Upload size={12} /> Upload files</button>
                     <span className="font-mono text-[10px]" style={{ color: "#9A9D94" }}>PDF, images, code files</span>
                   </div>
                   <button onClick={() => handleSubmit(proj.id)} disabled={!description.trim() || submitting === proj.id} className="font-mono text-xs font-bold px-4 py-2 rounded-lg text-white transition-all hover:shadow-md disabled:opacity-50" style={{ background: "linear-gradient(135deg, #244B35, #1C3D2B)" }}>{submitting === proj.id ? "Submitting..." : "Submit for Review"}</button>
@@ -701,29 +778,211 @@ function ProjectsSection() {
 }
 
 /* ═══════════════════════════════════════════════════════
-   OPPORTUNITIES SECTION
+   OPPORTUNITIES SECTION — live + offline demo
    ═══════════════════════════════════════════════════════ */
-function OpportunitiesSection() {
+function ApplyButton({ opp, onApplied }: { opp: Opportunity; onApplied?: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const hasApplied = applications.some((a) => a.opportunityId === opp.id);
+  const showToast = (msg: string, bg = "#244B35") => {
+    const el = document.createElement("div");
+    el.className = "fixed top-4 right-4 z-50 px-4 py-3 rounded-xl text-white font-semibold text-sm shadow-lg max-w-[90vw]";
+    el.style.background = bg;
+    el.textContent = msg;
+    document.body.appendChild(el);
+    setTimeout(() => { el.style.opacity = "0"; el.style.transition = "opacity .3s"; setTimeout(() => el.remove(), 300); }, hasApplied ? 2000 : 3000);
+  };
+  const onApply = async () => {
+    if (hasApplied) { showToast("Already applied to this opportunity.", "#6B6F68"); return; }
+    if (busy) return;
+    setBusy(true);
+    try {
+      await studentApi.applyToOpportunity(opp.id);
+      showToast("Application submitted!");
+      try { notifyDataChanged(); } catch {}
+      onApplied?.();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      const isOffline = /Cannot reach|backend unreachable|Network|Failed to fetch|Load failed/i.test(msg);
+      const isDuplicate = /already|duplicate|uniq_application/i.test(msg);
+      if (isDuplicate) {
+        // Server says already applied — sync locally so UI reflects it
+        if (!applications.some((a) => a.opportunityId === opp.id)) {
+          applications.unshift({
+            id: `ap-${Date.now()}`,
+            opportunityId: opp.id,
+            role: opp.title,
+            org: opp.org,
+            stage: "applied",
+            stageLabel: "Applied",
+            status: "Submitted just now",
+            match: opp.match,
+            appliedDate: new Date().toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }),
+          });
+          try { localStorage.setItem("l2l.demo_applications", JSON.stringify(applications.slice(0, 30))); } catch {}
+          try { notifyDataChanged(); } catch {}
+          onApplied?.();
+        }
+        showToast("You already applied to this opportunity.");
+        return;
+      }
+      if (isOffline) {
+        // Offline/demo fallback — persist locally so Applications tab shows it
+        const newApp: Application = {
+          id: `ap-${Date.now()}`,
+          opportunityId: opp.id,
+          role: opp.title,
+          org: opp.org,
+          stage: "applied",
+          stageLabel: "Applied",
+          status: "Submitted just now (demo — backend not connected)",
+          match: opp.match,
+          appliedDate: new Date().toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }),
+        };
+        if (!applications.some((a) => a.opportunityId === opp.id)) applications.unshift(newApp);
+        try { localStorage.setItem("l2l.demo_applications", JSON.stringify(applications.slice(0, 30))); } catch {}
+        try { localStorage.setItem("l2l.demo_applied_ids", JSON.stringify(applications.map(a=>a.opportunityId))); } catch {}
+        try { notifyDataChanged(); } catch {}
+        onApplied?.();
+        showToast("Applied! (demo — saved offline, will sync when backend connects)");
+        return;
+      }
+      showToast(msg || "Could not apply. Try again.", "#7a3f1a");
+    } finally { setBusy(false); }
+  };
+  if (hasApplied) {
+    return <span className="font-mono text-xs font-bold px-4 py-2 rounded-lg inline-flex items-center gap-1.5" style={{ background: "#DCE6D0", color: "#244B35" }}><Check size={14}/> Applied</span>;
+  }
+  return <button onClick={onApply} disabled={busy} className="font-mono text-xs font-bold px-4 py-2 rounded-lg text-white transition-all hover:shadow-md hover:scale-[1.02] disabled:opacity-60" style={{ background: "linear-gradient(135deg, #244B35, #1C3D2B)" }}>{busy ? "Applying…": "Apply now"}</button>;
+}
+
+function OpportunityAIInsight({ opp }: { opp: Opportunity }) {
+  const [insight, setInsight] = React.useState<EnrichedMatch | null>(null);
+  const [busy, setBusy] = React.useState(false);
+  const load = async () => {
+    if (busy || insight) return;
+    setBusy(true);
+    try {
+      const r = await enrichOpportunityMatch(
+        { student, skillPassport, roleReadiness, gaps, simulator: { currentReadinessScore: roleReadiness.readinessScore, currentReadiness: roleReadiness.readiness, actions: simulatorActions }, recommendedProjects, opportunities, applications, recommendations, portfolio: portfolioData },
+        { id: opp.id, title: opp.title, requiredSkills: opp.requiredSkills, matchedSkills: opp.matchedSkills, missingSkills: opp.missingSkills }
+      );
+      setInsight(r);
+    } finally { setBusy(false); }
+  };
+  const badge = insight ? (insight.signals.some(s => s.why.includes("Verified") || s.why.includes("Present")) ? "Deterministic insight" : "AI re-rank") : "AI re-rank";
+  const showBadge = !!insight && insight.signals.length > 0;
+  return (
+    <div className="mt-3">
+      {!insight ? (
+        <button onClick={load} disabled={busy} className="font-mono text-[11px] font-bold px-3 py-1.5 rounded-lg border hover:bg-[#F0F5EC] disabled:opacity-50" style={{ borderColor: "#E6E3D7", color: "#244B35" }}>{busy ? "Analyzing…": "AI: why this match?"}</button>
+      ) : (
+        <div className="rounded-lg border p-3 text-xs" style={{ borderColor: "#D6E3CE", background: "#FAFCF7" }}>
+          <div style={{ color: "#171A18" }}>{insight!.rationale} {insight!.delta ? <span className="font-mono font-bold" style={{ color: insight!.delta > 0 ? "#244B35" : "#7a3f1a" }}>({insight!.delta > 0 ? "+": ""}{insight!.delta} pts)</span> : null}</div>
+          {insight!.signals.length > 0 && <ul className="mt-1.5 list-disc pl-4" style={{ color: "#6B6F68" }}>{insight!.signals.map((s, i) => <li key={i}><span className="font-semibold" style={{ color: s.positive ? "#244B35" : "#7a3f1a" }}>{s.skill}</span>: {s.why}</li>)}</ul>}
+          {showBadge && <div className="mt-1.5 flex items-center gap-1.5"><span className="font-mono text-[10px] px-2 py-0.5 rounded-md" style={{ background: "#DCE6D0", color: "#16301F" }}>{badge}</span><span className="font-mono text-[10px]" style={{ color: "#9A9D94" }}>· live when backend AI is configured, otherwise deterministic</span></div>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function OpportunityDetailsModal({ opp, open, onClose, onMockInterview }: { opp: Opportunity | null; open: boolean; onClose: () => void; onMockInterview?: (opp: Opportunity) => void }) {
+  if (!open || !opp) return null;
+  const hasApplied = opp ? applications.some((a) => a.opportunityId === opp.id) : false;
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" />
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 20 }} onClick={(e)=>e.stopPropagation()} className="relative w-full sm:max-w-lg rounded-t-[18px] sm:rounded-[18px] bg-white max-h-[86vh] overflow-y-auto shadow-2xl border" style={{ borderColor: "#E6E3D7" }}>
+        <div className="sticky top-0 bg-white p-5 pb-4 border-b flex items-start justify-between gap-4" style={{ borderColor: "#EDEBE0" }}>
+          <div>
+            <div className="flex items-center gap-2 mb-1"><Tag cls="evidence">{opp.type}</Tag><span className="font-mono text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: "#DCE6D0", color: "#244B35" }}>{opp.match}% match</span>{hasApplied && <span className="font-mono text-[10px] font-bold px-2 py-0.5 rounded-md" style={{ background:"#244B35", color:"#fff" }}>Applied</span>}</div>
+            <div className="font-semibold text-lg" style={{ color: "#171A18" }}>{opp.title}</div>
+            <div className="text-sm" style={{ color: "#6B6F68" }}>{opp.org} · {opp.location}</div>
+          </div>
+          <button onClick={onClose} className="w-8 h-8 rounded-lg border flex items-center justify-center hover:bg-[#FAFAF7] flex-shrink-0" style={{ borderColor: "#E6E3D7" }}>✕</button>
+        </div>
+        <div className="p-5 space-y-4">
+          <p className="text-sm leading-relaxed" style={{ color: "#6B6F68" }}>{opp.description}</p>
+          <div className="grid grid-cols-2 gap-3 text-xs">
+            <div className="rounded-lg p-3" style={{ background: "#FAFAF7", border: "1px solid #E6E3D7" }}><div className="font-mono text-[10px] font-bold tracking-widest uppercase" style={{ color: "#9A9D94" }}>Duration</div><div className="font-semibold mt-1" style={{ color: "#171A18" }}>{opp.duration}</div></div>
+            <div className="rounded-lg p-3" style={{ background: "#FAFAF7", border: "1px solid #E6E3D7" }}><div className="font-mono text-[10px] font-bold tracking-widest uppercase" style={{ color: "#9A9D94" }}>Stipend</div><div className="font-semibold mt-1" style={{ color: "#171A18" }}>{opp.stipend}</div></div>
+            <div className="rounded-lg p-3" style={{ background: "#FAFAF7", border: "1px solid #E6E3D7" }}><div className="font-mono text-[10px] font-bold tracking-widest uppercase" style={{ color: "#9A9D94" }}>Openings</div><div className="font-semibold mt-1" style={{ color: "#171A18" }}>{opp.openings}</div></div>
+            <div className="rounded-lg p-3" style={{ background: "#FAFAF7", border: "1px solid #E6E3D7" }}><div className="font-mono text-[10px] font-bold tracking-widest uppercase" style={{ color: "#9A9D94" }}>Deadline</div><div className="font-semibold mt-1" style={{ color: "#171A18" }}>{opp.deadline}</div></div>
+          </div>
+          <div><div className="font-mono text-[10px] font-bold tracking-widest uppercase mb-2" style={{ color: "#9A9D94" }}>Required skills</div><div className="flex flex-wrap gap-1.5">{opp.requiredSkills.map((s)=><Tag key={s} cls={opp.matchedSkills.includes(s) ? "verified":"high"}>{s}</Tag>)}</div></div>
+          <OpportunityAIInsight opp={opp} />
+          <div className="flex gap-2 pt-2 flex-wrap">
+            <ApplyButton opp={opp} onApplied={onClose} />
+            {onMockInterview && (
+              <button onClick={() => { onClose(); onMockInterview(opp); }} className="font-mono text-xs font-bold px-4 py-2 rounded-lg border inline-flex items-center gap-1.5" style={{ borderColor: "#244B35", color: "#244B35", background: "#F0F5EC" }}><Video size={12} /> Mock Interview</button>
+            )}
+            <button onClick={onClose} className="font-mono text-xs font-bold px-4 py-2 rounded-lg border flex-1" style={{ borderColor: "#E6E3D7", color: "#6B6F68" }}>Close</button>
+          </div>
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
+function OpportunitiesSection({ query: externalQuery, onQueryChange, onMockInterview }: { query?: string; onQueryChange?: (v: string)=>void; onMockInterview?: (opp: Opportunity)=>void }) {
+  const [localQuery, setLocalQuery] = useState(externalQuery ?? "");
+  const [detailOpp, setDetailOpp] = useState<Opportunity | null>(null);
+  // keep local in sync when parent drives query (header search)
+  useEffect(() => { if (externalQuery !== undefined) setLocalQuery(externalQuery); }, [externalQuery]);
+  const q = (externalQuery ?? localQuery).trim().toLowerCase();
+  const setQ = (v: string) => {
+    setLocalQuery(v);
+    onQueryChange?.(v);
+  };
+  const filtered = opportunities.filter((opp) => {
+    if (!q) return true;
+    const hay = [opp.title, opp.org, opp.description, opp.type, opp.location, ...opp.matchedSkills, ...opp.missingSkills, ...opp.requiredSkills].join(" ").toLowerCase();
+    return hay.includes(q);
+  });
+  const hasQuery = q.length > 0;
+
   return (
     <div className="flex flex-col gap-5">
-      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="rounded-[18px] border p-6 bg-white" style={{ borderColor: "#E6E3D7", boxShadow: "0 1px 3px rgba(0,0,0,.04)" }}>
+      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="rounded-[18px] border p-5 sm:p-6 bg-white" style={{ borderColor: "#E6E3D7", boxShadow: "0 1px 3px rgba(0,0,0,.04)" }}>
         <div className="flex items-center justify-between mb-1">
           <div className="absolute top-0 left-0 w-full h-1" style={{ background: "linear-gradient(90deg, #C98B5F, #E8D36B)" }} />
         <Eyebrow color="#C98B5F">Opportunities</Eyebrow>
-          <span className="font-mono text-[10px] font-bold px-2 py-0.5 rounded-md" style={{ background: "#F0E8DD", color: "#7a3f1a" }}>{opportunities.length} matched</span>
+          <span className="font-mono text-[10px] font-bold px-2 py-0.5 rounded-md" style={{ background: "#F0E8DD", color: "#7a3f1a" }}>{filtered.length} of {opportunities.length} matched</span>
         </div>
-        <div className="font-semibold text-[22px] tracking-tight mb-5">Discover Opportunities</div>
+        <div className="font-semibold text-[22px] tracking-tight mb-3">Discover Opportunities</div>
+        {/* Search — works offline, filters titles/skills/org */}
+        <div className="flex items-center gap-2 border rounded-xl px-3 py-2 bg-white mb-5" style={{ borderColor: "#E6E3D7" }}>
+          <Search size={14} style={{ color: "#9A9D94" }} />
+          <input value={externalQuery !== undefined ? externalQuery : localQuery} onChange={(e)=>setQ(e.target.value)} placeholder="Search skills, titles, orgs…" className="border-none outline-none bg-transparent text-[13px] flex-1" style={{ color: "#171A18" }} />
+          {(externalQuery !== undefined ? externalQuery : localQuery) && <button onClick={()=>setQ("")} className="font-mono text-[11px] font-bold px-2 py-1 rounded-md hover:bg-[#FAFAF7]" style={{ color: "#6B6F68" }}>Clear</button>}
+        </div>
+        {hasQuery && filtered.length === 0 && (
+          <EmptyState
+            icon={Search}
+            title={`No matches for “${q}”`}
+            description="Try “Python”, “Research” or “AIIA”."
+            accent="#C98B5F"
+            action={
+              <button onClick={()=>setQ("")} className="font-mono text-xs font-bold px-4 py-2 rounded-lg text-white" style={{ background: "#244B35" }}>Clear search</button>
+            }
+          />
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-          {opportunities.map((opp) => (
-            <div key={opp.id} className="rounded-xl border p-5 hover:shadow-md transition-shadow" style={{ borderColor: "#E6DDD5", background: "linear-gradient(180deg, #FDFCFA 0%, #FDF9F2 100%)" }}>
+          {filtered.map((opp) => {
+            const applied = applications.some((a)=>a.opportunityId===opp.id);
+            return (
+            <div key={opp.id} className="rounded-xl border p-5 hover:shadow-md transition-shadow flex flex-col" style={{ borderColor: "#E6DDD5", background: "linear-gradient(180deg, #FDFCFA 0%, #FDF9F2 100%)" }}>
               <div className="flex items-center justify-between mb-2">
                 <Tag cls="evidence">{opp.type}</Tag>
-                <div className="w-12 h-12 rounded-full flex items-center justify-center font-bold text-sm" style={{ background: "#DCE6D0", color: "#244B35" }}>{opp.match}%</div>
+                <div className="flex items-center gap-2">
+                  {applied && <span className="font-mono text-[10px] font-bold px-2 py-0.5 rounded-md" style={{ background: "#244B35", color: "#fff" }}>Applied</span>}
+                  <div className="w-11 h-11 rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0" style={{ background: "#DCE6D0", color: "#244B35" }}>{opp.match}%</div>
+                </div>
               </div>
               <div className="font-semibold text-[17px] mb-1" style={{ color: "#171A18" }}>{opp.title}</div>
               <div className="text-sm mb-2" style={{ color: "#6B6F68" }}>{opp.org}</div>
-              <p className="text-xs mb-3" style={{ color: "#6B6F68" }}>{opp.description}</p>
+              <p className="text-xs mb-3 line-clamp-2" style={{ color: "#6B6F68" }}>{opp.description}</p>
               <div className="flex flex-wrap gap-3 font-mono text-[11px] mb-3" style={{ color: "#6B6F68" }}>
                 <span className="inline-flex items-center gap-1"><MapPin size={11} /> {opp.location}</span>
                 <span className="inline-flex items-center gap-1"><Clock size={11} /> {opp.duration}</span>
@@ -735,14 +994,25 @@ function OpportunitiesSection() {
                 {opp.missingSkills.map((sk) => <Tag key={sk} cls="high">{sk}</Tag>)}
               </div>
               <div className="font-mono text-[10px] mb-3" style={{ color: "#6B6F68" }}>Deadline: {opp.deadline}</div>
-              <div className="flex gap-3">
-                <button onClick={() => { const el = document.createElement("div"); el.className = "fixed top-4 right-4 z-50 px-4 py-3 rounded-xl text-white font-semibold text-sm shadow-lg"; el.style.background = "#244B35"; el.textContent = "Application submitted!"; document.body.appendChild(el); setTimeout(() => el.remove(), 3000); }} className="font-mono text-xs font-bold px-4 py-2 rounded-lg text-white transition-all hover:shadow-md hover:scale-[1.02]" style={{ background: "linear-gradient(135deg, #244B35, #1C3D2B)" }}>Apply now</button>
-                <button className="font-mono text-xs font-bold px-4 py-2 rounded-lg border" style={{ borderColor: "#E6E3D7", color: "#6B6F68" }}>Details</button>
+              <OpportunityAIInsight opp={opp} />
+              <div className="flex gap-2 mt-4 flex-wrap">
+                <ApplyButton opp={opp} />
+                <button onClick={()=>setDetailOpp(opp)} className="font-mono text-xs font-bold px-4 py-2 rounded-lg border hover:bg-[#FAFAF7] transition-colors" style={{ borderColor: "#E6E3D7", color: "#6B6F68" }}>Details</button>
+                {onMockInterview && (
+                  <button onClick={()=>onMockInterview(opp)} className="font-mono text-xs font-bold px-3 py-2 rounded-lg border inline-flex items-center gap-1.5 hover:shadow-sm transition-all" style={{ borderColor: "#244B35", color: "#244B35", background: "#F0F5EC" }}><Video size={12} /> Mock Interview</button>
+                )}
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
+        {filtered.length === 0 && !hasQuery && (
+          <div className="mt-2">
+            <EmptyState icon={Briefcase} title="No opportunities yet" description="Check back after the backend syncs." accent="#244B35" />
+          </div>
+        )}
       </motion.div>
+      <OpportunityDetailsModal opp={detailOpp} open={!!detailOpp} onClose={()=>setDetailOpp(null)} onMockInterview={onMockInterview} />
     </div>
   );
 }
@@ -750,7 +1020,93 @@ function OpportunitiesSection() {
 /* ═══════════════════════════════════════════════════════
    APPLICATIONS SECTION
    ═══════════════════════════════════════════════════════ */
-function ApplicationsSection() {
+/* Two-way rating — a student rates an employer after a completed internship.
+   Mirrors the industry side: POST /api/student/ratings (Django backend). */
+function RateEmployerCard({ app }: { app: Application }) {
+  const [open, setOpen] = useState(false);
+  const [score, setScore] = useState(5);
+  const [feedback, setFeedback] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [done, setDone] = useState(app.rated ?? false);
+
+  if (!app.rateable) return null;
+
+  if (done) {
+    return (
+      <div className="flex items-center gap-2 mt-3 pt-3 text-xs" style={{ borderTop: "1px solid #E6E3D7" }}>
+        <Star size={13} style={{ color: "#E8D36B", fill: "#E8D36B" }} />
+        <span className="font-semibold" style={{ color: "#244B35" }}>You rated {app.org}</span>
+        <span className="font-mono text-[10px]" style={{ color: "#9A9D94" }}>Two-way rating submitted</span>
+      </div>
+    );
+  }
+
+  const submit = async () => {
+    if (busy || !app.employerUserId) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await studentApi.rateEmployer({
+        toId: app.employerUserId,
+        opportunityId: app.opportunityId,
+        score,
+        feedback,
+      });
+      setDone(true);
+      setOpen(false);
+      notifyDataChanged();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not submit rating.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="mt-3 pt-3" style={{ borderTop: "1px solid #E6E3D7" }}>
+      {!open ? (
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="inline-flex items-center gap-2 font-semibold text-xs px-3 py-2 rounded-lg transition-all hover:shadow-sm"
+          style={{ background: "#F0E8DD", color: "#7a3f1a" }}
+        >
+          <Star size={13} /> Rate {app.org}
+        </button>
+      ) : (
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center gap-1">
+            {[1, 2, 3, 4, 5].map((n) => (
+              <button key={n} type="button" onClick={() => setScore(n)} aria-label={`${n} star${n === 1 ? "" : "s"}`} className="transition-transform hover:scale-110">
+                <Star size={18} style={{ color: n <= score ? "#E8D36B" : "#D8D4C8", fill: n <= score ? "#E8D36B" : "none" }} />
+              </button>
+            ))}
+            <span className="font-mono text-[11px] ml-1" style={{ color: "#6B6F68" }}>{score}/5</span>
+          </div>
+          <textarea
+            value={feedback}
+            onChange={(e) => setFeedback(e.target.value)}
+            rows={2}
+            placeholder={`How was your experience with ${app.org}?`}
+            className="rounded-lg border outline-none text-xs p-2.5 w-full resize-none"
+            style={{ borderColor: "#E6E3D7", background: "#FAFAF7" }}
+          />
+          {error && <span className="font-mono text-[10px]" style={{ color: "#B0502F" }}>{error}</span>}
+          <div className="flex items-center gap-2">
+            <button type="button" disabled={busy} onClick={submit} className="font-semibold text-[11px] px-4 py-2 rounded-lg text-white transition-all hover:shadow-sm disabled:opacity-60" style={{ background: "#244B35" }}>
+              {busy ? "Submitting…" : "Submit rating"}
+            </button>
+            <button type="button" onClick={() => setOpen(false)} className="font-semibold text-[11px] px-3 py-2 rounded-lg" style={{ color: "#6B6F68" }}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+function ApplicationsSection({ onNavigate }: { onNavigate?: (id: string) => void } = {}) {
   const stages = ["Applied", "Shortlisted", "Interviewed", "Offered", "Joined"];
 
   return (
@@ -769,6 +1125,20 @@ function ApplicationsSection() {
             </div>
           ))}
         </div>
+
+        {applications.length === 0 && (
+          <EmptyState
+            icon={FileText}
+            title="No applications yet"
+            description="Apply to opportunities to start your journey."
+            accent="#8A6FB8"
+            action={
+              <button onClick={() => onNavigate?.("opportunities")} className="font-mono text-xs font-bold px-4 py-2 rounded-lg text-white inline-flex items-center gap-1.5" style={{ background: "linear-gradient(135deg, #244B35, #1C3D2B)" }}>
+                {"Browse opportunities"} <ChevronRight size={12} />
+              </button>
+            }
+          />
+        )}
 
         <div className="flex flex-col gap-4">
           {applications.map((app) => (
@@ -794,6 +1164,7 @@ function ApplicationsSection() {
                   const isCurrent = app.stage === stKey || (app.stage === "shortlisted" && i <= 1) || (app.stage === "interviewed" && i <= 2);
                   return <div key={st} className="flex-1 h-1.5 rounded-full" style={{ background: isCurrent ? "#244B35" : "#E6E3D7" }} />;
                 })}
+              <RateEmployerCard app={app} />
               </div>
             </div>
           ))}
@@ -806,7 +1177,7 @@ function ApplicationsSection() {
 /* ═══════════════════════════════════════════════════════
    RECOMMENDATIONS SECTION
    ═══════════════════════════════════════════════════════ */
-function RecommendationsSection() {
+function RecommendationsSection({ onNavigate }: { onNavigate?: (id:string)=>void } = {}) {
   return (
     <div className="flex flex-col gap-5">
       <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="rounded-[18px] border p-6 bg-white" style={{ borderColor: "#E6E3D7", boxShadow: "0 1px 3px rgba(0,0,0,.04)" }}>
@@ -815,6 +1186,8 @@ function RecommendationsSection() {
         <div className="font-semibold text-[22px] tracking-tight mt-2 mb-1">Recommended For Your Skill Gaps</div>
         <p className="text-xs mb-5" style={{ color: "#6B6F68" }}>Each recommendation is directly connected to a specific skill gap.</p>
 
+        <ScholarshipPanel dashboard={{ student, skillPassport, roleReadiness, gaps, simulator: { currentReadinessScore: roleReadiness.readinessScore, currentReadiness: roleReadiness.readiness, actions: simulatorActions }, recommendedProjects, opportunities, applications, recommendations, portfolio: portfolioData }} />
+        <ModelDisclaimer />
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {recommendations.map((rec) => (
             <div key={rec.id} className="rounded-xl border p-5" style={{ borderColor: "#E6E3D7", background: "#FAFAF7" }}>
@@ -828,7 +1201,7 @@ function RecommendationsSection() {
               <p className="text-xs mb-3" style={{ color: "#6B6F68" }}>{rec.why}</p>
               <div className="flex items-center justify-between">
                 <span className="font-mono text-[10px] font-bold px-2 py-0.5 rounded-md" style={{ background: "#DCE6D0", color: "#244B35" }}>+{rec.projectedImprovement}% improvement</span>
-                <button className="font-mono text-xs font-bold text-[#244B35] inline-flex items-center gap-1.5 hover:gap-3 transition-all px-3 py-1.5 rounded-lg hover:bg-[#F0F5EC]">Start learning <ChevronRight size={12} /></button>
+                <button onClick={() => { const el=document.createElement("div"); el.className="fixed top-4 right-4 z-50 px-4 py-3 rounded-xl text-white font-semibold text-sm shadow-lg"; el.style.background="#244B35"; el.textContent="Added to your learning plan — check Learn tab!"; document.body.appendChild(el); setTimeout(()=>el.remove(),2500); onNavigate?.("recommendations"); }} className="font-mono text-xs font-bold text-[#244B35] inline-flex items-center gap-1.5 hover:gap-3 transition-all px-3 py-1.5 rounded-lg hover:bg-[#F0F5EC]">Start learning <ChevronRight size={12} /></button>
               </div>
             </div>
           ))}
@@ -883,6 +1256,25 @@ function PortfolioSection() {
 }
 
 /* ═══════════════════════════════════════════════════════
+   AI PROFILE OPTIMIZER SECTION
+   ═══════════════════════════════════════════════════════ */
+function ProfileOptimizerSection() {
+  const dashboardData: StudentDashboard = {
+    student,
+    skillPassport,
+    roleReadiness,
+    gaps,
+    simulator: { currentReadinessScore: roleReadiness.readinessScore, currentReadiness: roleReadiness.readiness, actions: simulatorActions },
+    recommendedProjects,
+    opportunities,
+    applications,
+    recommendations,
+    portfolio: portfolioData,
+  };
+
+  return <ProfileOptimizerPanel dashboard={dashboardData} />;
+}
+/* ═══════════════════════════════════════════════════════
    SETTINGS SECTION
    ═══════════════════════════════════════════════════════ */
 function SettingsSection() {
@@ -893,10 +1285,49 @@ function SettingsSection() {
   const [notifs, setNotifs] = useState({ email: true, push: true, opportunities: true, digest: false });
   const [saved, setSaved] = useState(false);
 
-  const handleSave = () => {
-    // TODO: POST to /api/student/settings with { name, email, phone, bio, notifications: notifs }
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+  const [saving, setSaving] = React.useState(false);
+  const [saveErr, setSaveErr] = React.useState<string | null>(null);
+  const handleSave = async () => {
+    setSaving(true);
+    setSaveErr(null);
+    try {
+      await studentApi.updateSettings({ name, email, phone, bio, notifications: notifs });
+      try { notifyDataChanged(); } catch {}
+      student.name = name;
+      student.email = email;
+      student.phone = phone;
+      student.bio = bio;
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+      const el = document.createElement("div");
+      el.className = "fixed top-4 right-4 z-50 px-4 py-3 rounded-xl text-white font-semibold text-sm shadow-lg";
+      el.style.background = "#244B35";
+      el.textContent = "Settings saved.";
+      document.body.appendChild(el);
+      setTimeout(() => el.remove(), 2500);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      const isOffline = /Cannot reach|backend unreachable|Network|Failed to fetch|Load failed/i.test(msg);
+      if (isOffline) {
+        try { localStorage.setItem("l2l.demo_student_settings", JSON.stringify({ name, email, phone, bio, notifs })); } catch {}
+        student.name = name;
+        student.email = email;
+        student.phone = phone;
+        student.bio = bio;
+        setSaved(true);
+        setTimeout(() => setSaved(false), 2000);
+        const el = document.createElement("div");
+        el.className = "fixed top-4 right-4 z-50 px-4 py-3 rounded-xl text-white font-semibold text-sm shadow-lg";
+        el.style.background = "#6B6F68";
+        el.textContent = "Saved offline (demo) — will sync when backend connects.";
+        document.body.appendChild(el);
+        setTimeout(() => el.remove(), 2800);
+      } else {
+        setSaveErr(msg || "Could not save. Try again.");
+      }
+    } finally {
+      setSaving(false);
+    }
   };
 
   const inputCls = "w-full rounded-lg border px-3 py-2 text-sm outline-none transition-colors";
@@ -937,10 +1368,13 @@ function SettingsSection() {
         </div>
       </motion.div>
 
-      <div className="flex items-center justify-end gap-3">
-        <span className="text-xs" style={{ color: "#9A9D94" }}>Changes are saved locally. Connect backend to persist.</span>
-        <button onClick={handleSave} className="font-mono text-xs font-bold px-5 py-2.5 rounded-lg text-white transition-colors" style={{ background: saved ? "#244B35" : "#244B35" }}>
-          {saved ? "\u2713 Saved" : "Save changes"}
+      <div className="flex flex-col sm:flex-row items-center justify-end gap-3">
+        <div className="flex flex-col items-end gap-1">
+          {saveErr && <span className="font-mono text-[11px] font-bold" style={{ color: "#B0502F" }}>{saveErr}</span>}
+          {!saveErr && <span className="text-xs" style={{ color: "#9A9D94" }}>{saving ? "Saving…" : saved ? "Saved" : "Edits save to your account."}</span>}
+        </div>
+        <button onClick={handleSave} disabled={saving} className="font-mono text-xs font-bold px-5 py-2.5 rounded-lg text-white transition-colors disabled:opacity-60" style={{ background: saved ? "#244B35" : "linear-gradient(135deg, #244B35, #1C3D2B)" }}>
+          {saving ? "Saving…" : saved ? "\u2713 Saved" : "Save changes"}
         </button>
       </div>
     </div>
@@ -952,31 +1386,97 @@ function SettingsSection() {
    ═══════════════════════════════════════════════════════ */
 export default function StudentDashboard() {
   const [activeNav, setActiveNav] = useState("overview");
+  const [extractionOpen, setExtractionOpen] = useState(false);
+  const [evidenceOpen, setEvidenceOpen] = useState(false);
+  const [mockOpp, setMockOpp] = useState<Opportunity | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [reportOpen, setReportOpen] = useState(false);
+  const [onboardingOpen, setOnboardingOpen] = useState(false);
+  const [, setTick] = useState(0);
+  // Make mock+offline apps reactive: any notifyDataChanged() forces a re-render
+  useEffect(() => {
+    const unsub = subscribeDataChanged(() => setTick((t) => t + 1));
+    // Restore demo applications persisted offline so Applications tab survives reload
+    try {
+      const raw = localStorage.getItem("l2l.demo_applications");
+      if (raw) {
+        const arr = JSON.parse(raw);
+        if (Array.isArray(arr)) {
+          for (const a of arr) {
+            if (!applications.some((x) => x.id === a.id && x.opportunityId === a.opportunityId)) applications.unshift(a as Application);
+          }
+        }
+      }
+    } catch {}
+    // Restore onboarding-generated gap plan (picked roles -> initial gaps)
+    try {
+      const rawGaps = localStorage.getItem("l2l.onboarding_gaps");
+      if (rawGaps) {
+        const arr = JSON.parse(rawGaps);
+        if (Array.isArray(arr)) {
+          for (const g of arr) {
+            if (!gaps.some((x) => x.id === g.id)) gaps.push(g as SkillGap);
+          }
+        }
+      }
+    } catch {}
+    // First-visit onboarding wizard
+    try {
+      if (!localStorage.getItem("l2l.onboarding_done")) setOnboardingOpen(true);
+    } catch {}
+    return unsub;
+  }, []);
+
+  /** Persist the onboarding choice and generate the initial skill gap plan. */
+  const handleOnboardingComplete = (roles: string[]) => {
+    try {
+      localStorage.setItem("l2l.onboarding_done", "1");
+      localStorage.setItem("l2l.onboarding_roles", JSON.stringify(roles));
+    } catch {}
+    try {
+      const owned = new Set(skillPassport.items.map((sk) => sk.name.toLowerCase()));
+      const added: SkillGap[] = [];
+      let idx = 0;
+      for (const rid of roles) {
+        const role = ONBOARDING_ROLES.find((r) => r.id === rid);
+        if (!role) continue;
+        for (const sk of role.skills) {
+          const name = sk.toLowerCase();
+          if (owned.has(name) || gaps.some((g) => g.name.toLowerCase() === name) || added.some((g) => g.name.toLowerCase() === name)) continue;
+          idx += 1;
+          added.push({ id: `gp-onb-${idx}`, taxonomyId: `TC-ONB-${idx}`, name: sk, current: 40, required: 75, severity: idx % 2 ? "High" : "Medium", evidenceNeeded: true });
+        }
+      }
+      if (added.length) {
+        gaps.push(...added);
+        localStorage.setItem("l2l.onboarding_gaps", JSON.stringify(added));
+      }
+      try { notifyDataChanged(); } catch {}
+    } catch {}
+  };
 
   const hour = new Date().getHours();
   const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
-  const titleMap: Record<string, string> = {
-    overview: "Overview", profile: "My Profile", passport: "Skill Passport",
-    gaps: "Skill Gap Analysis", simulator: "Skill Gap Simulator",
-    projects: "Projects", opportunities: "Opportunities",
-    applications: "Applications", recommendations: "Learning",
-    portfolio: "Portfolio", settings: "Settings",
-  };
+  const sectionTitle = activeNav === "overview"
+    ? `${greeting}, ${student.name.split(" ")[0]}.`
+    : (navLinks.find((n) => n.id === activeNav)?.label ?? activeNav);
 
   const renderSection = () => {
     switch (activeNav) {
-      case "overview": return <OverviewSection />;
-      case "profile": return <ProfileSection />;
+      case "overview": return <OverviewSection onExtractSkills={() => setExtractionOpen(true)} onUploadEvidence={() => setEvidenceOpen(true)} onNavigate={setActiveNav} />;
+      case "profile": return <ProfileSection onNavigate={setActiveNav} />;
       case "passport": return <SkillPassportSection />;
-      case "gaps": return <SkillGapSection />;
+      case "gaps": return <SkillGapSection onNavigate={setActiveNav} />;
       case "simulator": return <SimulatorSection />;
       case "projects": return <ProjectsSection />;
-      case "opportunities": return <OpportunitiesSection />;
-      case "applications": return <ApplicationsSection />;
-      case "recommendations": return <RecommendationsSection />;
+      case "opportunities": return <OpportunitiesSection query={searchQuery} onQueryChange={setSearchQuery} onMockInterview={setMockOpp} />;
+      case "scholarships": return <RecommendationsSection />;
+      case "applications": return <ApplicationsSection onNavigate={setActiveNav} />;
+      case "recommendations": return <RecommendationsSection onNavigate={setActiveNav} />;
       case "portfolio": return <PortfolioSection />;
+      case "optimizer": return <ProfileOptimizerSection />;
       case "settings": return <SettingsSection />;
-      default: return <OverviewSection />;
+      default: return <OverviewSection onExtractSkills={() => setExtractionOpen(true)} onUploadEvidence={() => setEvidenceOpen(true)} onNavigate={setActiveNav} />;
     }
   };
 
@@ -989,17 +1489,18 @@ export default function StudentDashboard() {
       </Sidebar>
 
       <main className="flex-1 h-screen overflow-y-auto">
-        <div className="max-w-[1200px] mx-auto px-5 md:px-8 py-6 md:py-8">
+        <div className="max-w-[1200px] mx-auto px-5 md:px-8 pt-6 pb-24 md:py-8">
           <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }} className="flex items-start justify-between">
             <div>
               <h1 className="font-semibold text-[22px] md:text-[26px] tracking-tight" style={{ color: "#171A18" }}>
-                {activeNav === "overview" ? `${greeting}, ${student.name.split(" ")[0]}.` : titleMap[activeNav]}
+                {sectionTitle}
               </h1>
               {activeNav === "overview" && <p className="text-sm mt-0.5" style={{ color: "#6B6F68" }}>Here is what your skill journey looks like today.</p>}
             </div>
             <div className="flex items-center gap-2">
-              <div className="hidden sm:flex items-center gap-2 border rounded-xl px-3 py-2 bg-white" style={{ borderColor: "#E6E3D7" }}><Search size={14} style={{ color: "#9A9D94" }} /><input type="text" placeholder="Search skills, opportunities..." className="border-none outline-none bg-transparent text-[13px] w-48" style={{ color: "#171A18" }} /></div>
-              <button className="relative w-9 h-9 rounded-xl border bg-white flex items-center justify-center hover:bg-[#EFEDE3] transition-colors" style={{ borderColor: "#E6E3D7" }}><Bell size={16} /><span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full" style={{ background: "#C98B5F" }} /></button>
+              <div className="hidden sm:flex items-center gap-2 border rounded-xl px-3 py-2 bg-white flex-1 sm:flex-none max-w-[260px]" style={{ borderColor: "#E6E3D7" }}><Search size={14} style={{ color: "#9A9D94" }} /><input value={searchQuery} onChange={(e)=>{ setSearchQuery(e.target.value); if(e.target.value) setActiveNav("opportunities"); }} placeholder="Search skills, opportunities..." className="border-none outline-none bg-transparent text-[13px] w-full sm:w-48" style={{ color: "#171A18" }} />{searchQuery && <button onClick={()=>setSearchQuery("")} className="font-mono text-[10px] font-bold" style={{ color: "#9A9D94" }}>✕</button>}</div>
+              <button type="button" onClick={() => setReportOpen(true)} aria-label="Print / Save as PDF" title="Print / Save as PDF" className="w-9 h-9 rounded-xl border bg-white flex items-center justify-center hover:bg-[#EFEDE3] transition-colors" style={{ borderColor: "#E6E3D7", color: "#6B6F68" }}><Printer size={16} /></button>
+              <button type="button" aria-label="Notifications" className="relative w-9 h-9 rounded-xl border bg-white flex items-center justify-center hover:bg-[#EFEDE3] transition-colors" style={{ borderColor: "#E6E3D7" }}><Bell size={16} /><span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full" style={{ background: "#C98B5F" }} /></button>
             </div>
           </motion.div>
 
@@ -1012,6 +1513,41 @@ export default function StudentDashboard() {
           </div>
         </div>
       </main>
+      <SkillExtractionModal open={extractionOpen} onClose={() => setExtractionOpen(false)} />
+      <EvidenceUploadModal open={evidenceOpen} onClose={() => setEvidenceOpen(false)} />
+      <MockInterviewModal
+        open={!!mockOpp}
+        opportunity={mockOpp}
+        onClose={() => setMockOpp(null)}
+        onNavigate={setActiveNav}
+        dashboard={{ student, skillPassport, roleReadiness, gaps, simulator: { currentReadinessScore: roleReadiness.readinessScore, currentReadiness: roleReadiness.readiness, actions: simulatorActions }, recommendedProjects, opportunities, applications, recommendations, portfolio: portfolioData }}
+      />
+      <ReadinessReportModal
+        open={reportOpen}
+        onClose={() => setReportOpen(false)}
+        student={{ name: student.name, initials: student.initials, course: student.course, year: student.year, institution: student.institution, targetRole: student.targetRole }}
+        readiness={{ label: roleReadiness.readiness, score: roleReadiness.readinessScore, matched: roleReadiness.matchedSkills, total: roleReadiness.totalRequired, explanation: roleReadiness.explanation }}
+        skills={skillPassport.items.map((sk) => ({ name: sk.name, category: sk.category, origin: sk.origin, confidence: sk.confidence }))}
+        gaps={gaps.map((g) => ({ name: g.name, severity: g.severity, current: g.current, required: g.required }))}
+        evidence={{ verified: skillPassport.verifiedEvidence, total: skillPassport.totalEvidence }}
+      />
+      <OnboardingWizard
+        open={onboardingOpen}
+        onClose={() => { setOnboardingOpen(false); try { localStorage.setItem("l2l.onboarding_done", "1"); } catch {} }}
+        existingSkills={skillPassport.items.map((sk) => sk.name)}
+        onComplete={handleOnboardingComplete}
+      />
+      <MobileTabBar
+        items={[
+          { id: "overview", label: "Overview", icon: <LayoutDashboard size={18} /> },
+          { id: "passport", label: "Skill Passport", icon: <Shield size={18} /> },
+          { id: "opportunities", label: "Opportunities", icon: <Briefcase size={18} /> },
+          { id: "applications", label: "Applications", icon: <FileText size={18} /> },
+          { id: "settings", label: "Settings", icon: <Settings size={18} /> },
+        ]}
+        active={activeNav}
+        onChange={setActiveNav}
+      />
     </div>
   );
 }

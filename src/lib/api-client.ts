@@ -3,10 +3,11 @@
  *
  *  - Base URL: VITE_API_URL (e.g. https://api.example.com/api), defaults to
  *    http://localhost:8000/api for local development.
- *  - Access token is attached to every request.
- *  - A 401 triggers exactly one refresh attempt (refresh token), then the
- *    original request is retried. If refresh fails the tokens are cleared and
- *    the caller is redirected to /login by the UI layer.
+ *  - Authentication is Firebase: the bearer token comes from the token provider
+ *    registered by src/lib/auth.tsx (a Firebase ID token, refreshed by the SDK),
+ *    so this module knows nothing about how sessions are obtained.
+ *  - A 401 invokes the registered unauthorized handler (which signs out) so the
+ *    UI never keeps showing a workspace the API refuses to serve.
  */
 import axios, { AxiosError } from "axios";
 
@@ -14,41 +15,22 @@ export const API_BASE_URL = (
   import.meta.env.VITE_API_URL as string | undefined
 )?.replace(/\/+$/, "") || "http://localhost:8000/api";
 
-const ACCESS_KEY = "l2l.access_token";
-const REFRESH_KEY = "l2l.refresh_token";
+/** Supplies the bearer token for every request (Firebase ID token). */
+type TokenProvider = () => Promise<string | null>;
 
-export function getAccessToken(): string | null {
-  try {
-    return localStorage.getItem(ACCESS_KEY);
-  } catch {
-    return null;
-  }
+let tokenProvider: TokenProvider = async () => null;
+
+export function setAccessTokenProvider(provider: TokenProvider | null): void {
+  tokenProvider = provider ?? (async () => null);
 }
 
-export function getRefreshToken(): string | null {
-  try {
-    return localStorage.getItem(REFRESH_KEY);
-  } catch {
-    return null;
-  }
-}
+/** Called once per 401 so the auth layer can drop the session. */
+type UnauthorizedHandler = () => void;
 
-export function setTokens(access: string, refresh: string): void {
-  try {
-    localStorage.setItem(ACCESS_KEY, access);
-    localStorage.setItem(REFRESH_KEY, refresh);
-  } catch {
-    /* storage unavailable — session continues without persistence */
-  }
-}
+let unauthorizedHandler: UnauthorizedHandler | null = null;
 
-export function clearTokens(): void {
-  try {
-    localStorage.removeItem(ACCESS_KEY);
-    localStorage.removeItem(REFRESH_KEY);
-  } catch {
-    /* noop */
-  }
+export function setUnauthorizedHandler(handler: UnauthorizedHandler | null): void {
+  unauthorizedHandler = handler;
 }
 
 export const apiClient = axios.create({
@@ -56,54 +38,23 @@ export const apiClient = axios.create({
   headers: { "Content-Type": "application/json" },
 });
 
-apiClient.interceptors.request.use((config) => {
-  const token = getAccessToken();
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+apiClient.interceptors.request.use(async (config) => {
+  try {
+    const token = await tokenProvider();
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+  } catch {
+    /* no token available — the request goes out anonymous and may 401 */
   }
   return config;
 });
 
-let refreshPromise: Promise<string | null> | null = null;
-
-/** Single-flight token refresh shared by every concurrent 401. */
-export function refreshAccessToken(): Promise<string | null> {
-  if (!refreshPromise) {
-    refreshPromise = (async () => {
-      const refresh = getRefreshToken();
-      if (!refresh) return null;
-      try {
-        const { data } = await axios.post(`${API_BASE_URL}/auth/token/refresh`, { refresh });
-        if (data?.access) {
-          setTokens(data.access, data.refresh ?? refresh);
-          return data.access as string;
-        }
-        return null;
-      } catch {
-        clearTokens();
-        return null;
-      } finally {
-        refreshPromise = null;
-      }
-    })();
-  }
-  return refreshPromise;
-}
-
 apiClient.interceptors.response.use(
   (response) => response,
-  async (error: AxiosError) => {
-    const original = error.config as (typeof error.config & { _retried?: boolean }) | undefined;
-    const status = error.response?.status;
-
-    if (status === 401 && original && !original._retried) {
-      const newToken = await refreshAccessToken();
-      if (newToken) {
-        original._retried = true;
-        original.headers = original.headers ?? {};
-        original.headers.Authorization = `Bearer ${newToken}`;
-        return apiClient(original);
-      }
+  (error: AxiosError) => {
+    if (error.response?.status === 401) {
+      unauthorizedHandler?.();
     }
     return Promise.reject(error);
   },
@@ -122,6 +73,7 @@ export function apiErrorMessage(err: unknown): string {
       if (data.password?.length) return data.password[0];
     }
     if (!err.response) return "Cannot reach the server. Is the API running?";
+    if (err.response.status === 401) return "Your session expired. Please sign in again.";
     return `Request failed (${err.response.status}).`;
   }
   return err instanceof Error ? err.message : "Something went wrong.";

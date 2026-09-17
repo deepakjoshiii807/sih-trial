@@ -62,6 +62,10 @@ export interface Opportunity {
   shortlistedCount: number;
   createdAt: string;
   blindShortlisting: boolean;
+  /** Applicants still awaiting an industry decision (SLA). */
+  slaAwaiting?: number;
+  /** True when an applicant has been waiting past the SLA window → listing auto-flagged stale. */
+  slaBreached?: boolean;
 }
 
 export type ApplicationStage = "applied" | "shortlisted" | "interviewed" | "offered" | "joined" | "rejected";
@@ -118,9 +122,10 @@ export interface SLATracker {
   candidateName: string;
   opportunityTitle: string;
   appliedDate: string;
-  deadline: string;
+  /** When the industry must have responded (application date + 7-day SLA). */
+  respondBy: string;
   timeRemaining: string;
-  slaStatus: "on-track" | "warning" | "overdue";
+  slaStatus: "on-track" | "warning" | "breached";
   daysRemaining: number;
 }
 
@@ -150,6 +155,13 @@ export interface Rating {
   opportunity: string;
 }
 
+export interface Reputation {
+  /** Average score of ratings this partner received from students. */
+  avgScore: number;
+  count: number;
+  reviews: Rating[];
+}
+
 export interface IndustryDashboard {
   company: Company;
   opportunities: Opportunity[];
@@ -157,6 +169,7 @@ export interface IndustryDashboard {
   slaTrackers: SLATracker[];
   analytics: IndustryAnalytics;
   ratings: Rating[];
+  reputation?: Reputation;
 }
 
 export const industryApi = {

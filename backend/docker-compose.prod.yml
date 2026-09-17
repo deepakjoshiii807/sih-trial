@@ -1,0 +1,16 @@
+# Production overrides for a single-host deployment (see deploy/AWS-AL2023.md).
+#
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#
+# The change that matters: the API is published on the loopback interface only,
+# so nginx — the TLS terminator in front of it — is the only thing reachable
+# from the internet. Without this, gunicorn is exposed directly on :8000 and
+# anyone who scans the Elastic IP hits the API over plain HTTP.
+#
+# `!override` replaces the base file's `ports` list instead of merging with it
+# (Compose v2.24+). On an older Compose release, drop this file and edit the
+# `ports` line in docker-compose.yml to "127.0.0.1:8000:8000" instead.
+services:
+  web:
+    ports: !override
+      - "127.0.0.1:8000:8000"

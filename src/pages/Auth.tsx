@@ -7,16 +7,21 @@ import DigiLockerPanel from "@/components/ui/digilocker-panel";
 import SkillGapPanel from "@/components/ui/skill-gap-panel";
 import FeatureSections from "@/components/ui/feature-sections";
 import SiteFooter from "@/components/ui/site-footer";
-
-const navItems = [
-  { name: "Home", url: "#hero", icon: Home },
-  { name: "About", url: "#about", icon: Compass },
-  { name: "Skills", url: "#skills", icon: BarChart3 },
-  { name: "Features", url: "#features", icon: Sparkles },
-  { name: "Login", url: "/login", icon: LogIn, isAction: true, highlight: true },
-];
+import { usePageMeta } from "@/lib/use-page-meta";
 
 export default function Auth() {
+  const navItems = [
+    { name: "Home", url: "#hero", icon: Home },
+    { name: "About", url: "#about", icon: Compass },
+    { name: "Skills", url: "#skills", icon: BarChart3 },
+    { name: "Features", url: "#features", icon: Sparkles },
+    { name: "Login", url: "/login", icon: LogIn, isAction: true, highlight: true },
+  ];
+  usePageMeta(
+    "Learn2Lead — Courses, Scholarships, Internships & Jobs for Students in India",
+    "Learn2Lead helps students and young professionals in India discover courses, scholarships, internships and jobs tailored to their goals, verified skills and interests.",
+  );
+
   return (
     <div className="min-h-screen">
       <AnimeNavBar items={navItems} defaultActive="Home" />
@@ -32,7 +37,7 @@ export default function Auth() {
       <section className="bg-[#f0f0f2] hidden lg:block py-16 sm:py-32 px-4 sm:px-6">
         <div className="max-w-4xl mx-auto">
           <MagicText
-            text="Hi there! We're Lead2Learn, building the future of opportunity discovery for students across India. Thank you for all the support and love. We hope you enjoy using L2L as much as we enjoyed creating it."
+            text="Hi there! We're Learn2Lead, building the future of opportunity discovery for students across India. Thank you for all the support and love. We hope you enjoy using L2L as much as we enjoyed creating it."
           />
         </div>
       </section>

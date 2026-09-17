@@ -1,4 +1,4 @@
-import { cn } from "@/lib/utils";
+import { Link } from "react-router";
 
 export default function SiteFooter() {
   return (
@@ -44,22 +44,22 @@ export default function SiteFooter() {
           Discover courses, scholarships, internships and jobs tailored to your skills, goals and interests across India.
         </p>
 
-        <div className="flex items-center gap-4 mt-6">
-          <a href="#" className="font-medium text-white/60 hover:text-white transition-all">
+        <nav className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 mt-6">
+          <Link to="/" className="font-medium text-white/60 hover:text-white transition-all">
             About
-          </a>
+          </Link>
           <div className="h-4 w-px bg-white/20"></div>
-          <a href="#" className="font-medium text-white/60 hover:text-white transition-all">
+          <Link to="/privacy" className="font-medium text-white/60 hover:text-white transition-all">
             Privacy Policy
-          </a>
+          </Link>
           <div className="h-4 w-px bg-white/20"></div>
-          <a href="#" className="font-medium text-white/60 hover:text-white transition-all">
+          <Link to="/terms" className="font-medium text-white/60 hover:text-white transition-all">
             Terms of Service
-          </a>
-        </div>
+          </Link>
+        </nav>
 
         <p className="mt-6 text-center text-white/30 text-xs">
-          Copyright © {new Date().getFullYear()} Lead2Learn. All rights reserved.
+          Copyright © {new Date().getFullYear()} Learn2Lead. All rights reserved.
         </p>
       </footer>
     </>

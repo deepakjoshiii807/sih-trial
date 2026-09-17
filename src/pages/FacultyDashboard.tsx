@@ -16,6 +16,9 @@ import type {
   CurriculumLoopStep, DepartmentAnalytics, AcademicianDashboard,
 } from "@/lib/faculty-api";
 import { facultyApi } from "@/lib/faculty-api";
+import FacultyAIQueue from "@/components/ui/faculty-ai-queue";
+import PrintButton from "@/components/ui/print-button";
+import DemandTimeline from "@/components/ui/charts/demand-timeline";
 
 /* ─── Mock Data ─── */
 let academician: Academician = { name: "Dr. Priya Mehta", initials: "PM", title: "Professor of Ayurveda & Research", department: "Department of Ayurveda", institution: "All India Institute of Ayurveda", email: "priya.mehta@aiia.ac.in", phone: "+91 98765 12345", bio: "Professor with 12 years of experience in clinical research, AYUSH studies, and curriculum development.", subjects: ["Clinical Research", "Pharmacology", "Research Methodology", "AYUSH Therapeutics"], researchInterests: ["Herbal Pharmacovigilance", "Clinical Trial Design", "AYUSH Healthcare Delivery"], experience: 12, studentsCount: 24, verifiedCount: 18 };
@@ -39,6 +42,22 @@ let demandTrends: DemandTrend[] = [
   { skill: "Pharmacology", direction: "stable", demandLevel: "Medium", changePercent: 5, period: "Last 6 months" },
   { skill: "Documentation", direction: "stable", demandLevel: "Low", changePercent: -2, period: "Last 6 months" },
   { skill: "Ayurvedic Therapeutics", direction: "up", demandLevel: "Medium", changePercent: 18, period: "Last 6 months" },
+];
+
+/* Monthly openings per skill — feeds the opportunity demand timeline chart. */
+const demandTimeline = [
+  { month: "Apr", "Clinical Research": 18, "Data Analysis": 12, "Machine Learning": 5, "Statistical Analysis": 9 },
+  { month: "May", "Clinical Research": 22, "Data Analysis": 16, "Machine Learning": 7, "Statistical Analysis": 12 },
+  { month: "Jun", "Clinical Research": 25, "Data Analysis": 21, "Machine Learning": 11, "Statistical Analysis": 15 },
+  { month: "Jul", "Clinical Research": 29, "Data Analysis": 27, "Machine Learning": 15, "Statistical Analysis": 19 },
+  { month: "Aug", "Clinical Research": 33, "Data Analysis": 33, "Machine Learning": 21, "Statistical Analysis": 23 },
+  { month: "Sep", "Clinical Research": 38, "Data Analysis": 41, "Machine Learning": 28, "Statistical Analysis": 27 },
+];
+const DEMAND_SKILLS = [
+  { key: "Clinical Research", color: "#244B35" },
+  { key: "Data Analysis", color: "#8A6FB8" },
+  { key: "Machine Learning", color: "#C98B5F" },
+  { key: "Statistical Analysis", color: "#B99A22" },
 ];
 
 let industryRoles: IndustryRole[] = [
@@ -122,14 +141,23 @@ function Eyebrow({ color, children }: { color?: string; children: React.ReactNod
 
 /* ─── Sidebar ─── */
 function SidebarContent({ activeNav, setActiveNav }: { activeNav: string; setActiveNav: (id: string) => void }) {
-  const { open } = useSidebar();
+  const { open, setOpen } = useSidebar();
+
+  /** Switch section and (on phones) close the drawer. */
+  const goTo = (id: string) => {
+    setActiveNav(id);
+    if (typeof window !== "undefined" && window.matchMedia("(max-width: 767px)").matches) {
+      setOpen(false);
+    }
+  };
+
   return (
     <>
       <div className="flex flex-col flex-1 overflow-y-auto overflow-x-hidden">
         <div className={open ? "" : "flex justify-center"}>{open ? <Logo /> : <LogoIcon />}</div>
         <div className="mt-8 flex flex-col gap-[2px]">
           {navLinks.map((link) => (
-            <button key={link.id} onClick={() => setActiveNav(link.id)}
+            <button key={link.id} onClick={() => goTo(link.id)}
               className={`flex items-center rounded-xl text-sm font-medium transition-colors relative ${open ? "gap-3 px-3 py-2.5" : "justify-center px-0 py-2.5"} ${activeNav === link.id ? "bg-[#244B35] text-white font-semibold" : "text-[#6B6F68] hover:bg-[#EDEBE0] hover:text-[#171A18]"}`}
               title={!open ? link.label : undefined}>
               <span className="flex-shrink-0 flex items-center justify-center" style={{ width: 20, height: 20 }}>{link.icon}</span>
@@ -140,7 +168,7 @@ function SidebarContent({ activeNav, setActiveNav }: { activeNav: string; setAct
         </div>
       </div>
       <div className="border-t pt-3 mt-2" style={{ borderColor: open ? "#E6E3D7" : "transparent" }}>
-        <button onClick={() => setActiveNav("settings")} className={`flex items-center gap-3 w-full rounded-xl text-[#6B6F68] text-xs font-medium hover:bg-[#EDEBE0] hover:text-[#171A18] transition-colors ${open ? "px-3 py-2" : "px-0 py-2 justify-center"}`}><Settings size={16} /> {open && "Settings"}</button>
+        <button onClick={() => goTo("settings")} className={`flex items-center gap-3 w-full rounded-xl text-[#6B6F68] text-xs font-medium hover:bg-[#EDEBE0] hover:text-[#171A18] transition-colors ${open ? "px-3 py-2" : "px-0 py-2 justify-center"}`}><Settings size={16} /> {open && "Settings"}</button>
         <SignOutButton open={open} />
         {open && <div className="mt-3 p-3 rounded-xl border" style={{ background: "#F7F6F0", borderColor: "#E6E3D7" }}><div className="flex items-center gap-2.5"><div className="w-9 h-9 rounded-lg flex items-center justify-center font-bold text-xs flex-shrink-0" style={{ background: "#8A6FB8", color: "#F0EAF8" }}>{academician.initials}</div><div className="min-w-0"><div className="font-semibold text-sm truncate" style={{ color: "#171A18" }}>{academician.name}</div><div className="text-[11px] font-mono" style={{ color: "#6B6F68" }}>{academician.department}</div></div></div></div>}
         {!open && <div className="flex justify-center mt-3"><div className="w-9 h-9 rounded-lg flex items-center justify-center font-bold text-xs" style={{ background: "#8A6FB8", color: "#F0EAF8" }}>{academician.initials}</div></div>}
@@ -246,7 +274,7 @@ function SkillIntelSection() {
         <p className="text-xs mb-5" style={{ color: "#6B6F68" }}>Industry demand vs curriculum coverage across your department.</p>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-left">
+          <table className="l2l-table tc-fac-skills w-full text-left">
             <thead><tr className="border-b" style={{ borderColor: "#E6E3D7" }}>
               <th className="font-mono text-[10px] font-bold tracking-widest uppercase py-3 pr-4" style={{ color: "#9A9D94" }}>Skill</th>
               <th className="font-mono text-[10px] font-bold tracking-widest uppercase py-3 px-4" style={{ color: "#9A9D94" }}>Demand</th>
@@ -303,6 +331,10 @@ function DemandSection() {
         <Eyebrow color="#244B35">Industry Demand</Eyebrow>
         <div className="font-semibold text-[22px] tracking-tight mt-2 mb-1" style={{ color: "#171A18" }}>Skill Demand Trends</div>
         <p className="text-xs mb-5" style={{ color: "#6B6F68" }}>What industry is requesting over the last 6 months.</p>
+
+        <div className="mb-6">
+          <DemandTimeline data={demandTimeline} skills={DEMAND_SKILLS} height={240} />
+        </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {demandTrends.map((dt) => (
@@ -434,6 +466,7 @@ function VerificationSection() {
         <Eyebrow color="#244B35">Student Verification</Eyebrow>
         <div className="font-semibold text-[22px] tracking-tight mt-2 mb-5" style={{ color: "#171A18" }}>Verification Queue</div>
 
+        <FacultyAIQueue items={verifications.map((v) => ({ id: v.id, title: v.title, description: v.description, skillsClaimed: v.skillsClaimed, status: v.status }))} />
         <div className="flex flex-col gap-4">
           {verifications.map((v) => (
             <div key={v.id} className="rounded-xl border p-5 hover:shadow-md transition-shadow" style={{ borderColor: v.status === "flagged" ? "#E8C7AE" : v.status === "approved" ? "#DCE6D0" : "#E6E3D7", background: v.status === "flagged" ? "linear-gradient(180deg, #FDFCFA 0%, #FDF8F3 100%)" : "linear-gradient(180deg, #FDFCFA 0%, #FAFCF7 100%)" }}>
@@ -449,8 +482,8 @@ function VerificationSection() {
               <div className="flex items-center justify-between pt-3 border-t" style={{ borderColor: "#EDEBE0" }}>
                 <div className="flex items-center gap-2"><Tag cls={v.type === "Project" ? "Research Collaboration" : v.type === "Certificate" ? "FDP" : "Industrial Training"}>{v.type}</Tag><span className="font-mono text-[11px]" style={{ color: "#9A9D94" }}>{v.submittedDate}</span></div>
                 {v.status === "pending" && <div className="flex gap-2">
-                  <button onClick={() => facultyApi.verifyStudent(v.id, "approved")} className="font-semibold text-[11px] px-3 py-1.5 rounded-lg transition-all hover:shadow-sm" style={{ background: "#DCE6D0", color: "#16301F" }}>Verify</button>
-                  <button onClick={() => facultyApi.verifyStudent(v.id, "changes-requested")} className="font-semibold text-[11px] px-3 py-1.5 rounded-lg border transition-all hover:bg-[#FAFAF7]" style={{ borderColor: "#E6E3D7" }}>Request Changes</button>
+                  <button onClick={async () => { try { await facultyApi.verifyStudent(v.id, "approved"); (v as any).status = "approved"; const el=document.createElement("div"); el.className="fixed top-4 right-4 z-50 px-4 py-3 rounded-xl text-white font-semibold text-sm shadow-lg"; el.style.background="#244B35"; el.textContent="Verified — student notified."; document.body.appendChild(el); setTimeout(()=>el.remove(),2500); } catch(err) { const m=err instanceof Error?err.message:String(err); const isOffline=/Cannot reach|backend unreachable|Network|Failed to fetch|Load failed/i.test(m); if(isOffline){ (v as any).status="approved"; try{localStorage.setItem("l2l.demo_verifications", JSON.stringify(verifications));}catch{} const el=document.createElement("div"); el.className="fixed top-4 right-4 z-50 px-4 py-3 rounded-xl text-white font-semibold text-sm shadow-lg"; el.style.background="#6B6F68"; el.textContent="Saved offline (demo) — flagged as verified locally."; document.body.appendChild(el); setTimeout(()=>el.remove(),2800);} else { const el=document.createElement("div"); el.className="fixed top-4 right-4 z-50 px-4 py-3 rounded-xl text-white font-semibold text-sm shadow-lg"; el.style.background="#7a3f1a"; el.textContent=m; document.body.appendChild(el); setTimeout(()=>el.remove(),2800);} } }} className="font-semibold text-[11px] px-3 py-1.5 rounded-lg transition-all hover:shadow-sm" style={{ background: "#DCE6D0", color: "#16301F" }}>Verify</button>
+                  <button onClick={async () => { try { await facultyApi.verifyStudent(v.id, "changes-requested"); (v as any).status = "changes-requested"; const el=document.createElement("div"); el.className="fixed top-4 right-4 z-50 px-4 py-3 rounded-xl text-white font-semibold text-sm shadow-lg"; el.style.background="#244B35"; el.textContent="Changes requested."; document.body.appendChild(el); setTimeout(()=>el.remove(),2500); } catch(err) { const m=err instanceof Error?err.message:String(err); const isOffline=/Cannot reach|backend unreachable|Network|Failed to fetch|Load failed/i.test(m); if(isOffline){ (v as any).status="changes-requested"; try{localStorage.setItem("l2l.demo_verifications", JSON.stringify(verifications));}catch{} const el=document.createElement("div"); el.className="fixed top-4 right-4 z-50 px-4 py-3 rounded-xl text-white font-semibold text-sm shadow-lg"; el.style.background="#6B6F68"; el.textContent="Saved offline (demo)."; document.body.appendChild(el); setTimeout(()=>el.remove(),2800);} else { const el=document.createElement("div"); el.className="fixed top-4 right-4 z-50 px-4 py-3 rounded-xl text-white font-semibold text-sm shadow-lg"; el.style.background="#7a3f1a"; el.textContent=m; document.body.appendChild(el); setTimeout(()=>el.remove(),2800);} } }} className="font-semibold text-[11px] px-3 py-1.5 rounded-lg border transition-all hover:bg-[#FAFAF7]" style={{ borderColor: "#E6E3D7" }}>Request Changes</button>
                 </div>}
               </div>
             </div>
@@ -676,7 +709,27 @@ function SettingsSection() {
   const [notifApp, setNotifApp] = useState(true);
   const [notifGap, setNotifGap] = useState(true);
   const [saved, setSaved] = useState(false);
-  const handleSave = () => { setSaved(true); setTimeout(() => setSaved(false), 2000); };
+  const [saving, setSaving] = useState(false);
+  const [saveErr, setSaveErr] = useState<string | null>(null);
+  const handleSave = async () => {
+    setSaving(true);
+    setSaveErr(null);
+    try {
+      await facultyApi.updateSettings({ name, email, phone, bio, notifications: { email: notifEmail, push: notifApp, gapAlerts: notifGap } });
+      academician.name = name; academician.email = email; academician.phone = phone; academician.bio = bio;
+      setSaved(true); setTimeout(() => setSaved(false), 2000);
+      const el = document.createElement("div"); el.className = "fixed top-4 right-4 z-50 px-4 py-3 rounded-xl text-white font-semibold text-sm shadow-lg"; el.style.background = "#244B35"; el.textContent = "Settings saved."; document.body.appendChild(el); setTimeout(() => el.remove(), 2500);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      const isOffline = /Cannot reach|backend unreachable|Network|Failed to fetch|Load failed/i.test(msg);
+      if (isOffline) {
+        try { localStorage.setItem("l2l.demo_faculty_settings", JSON.stringify({ name, email, phone, bio })); } catch {}
+        academician.name = name; academician.email = email; academician.phone = phone; academician.bio = bio;
+        setSaved(true); setTimeout(() => setSaved(false), 2000);
+        const el = document.createElement("div"); el.className = "fixed top-4 right-4 z-50 px-4 py-3 rounded-xl text-white font-semibold text-sm shadow-lg"; el.style.background = "#6B6F68"; el.textContent = "Saved offline (demo)."; document.body.appendChild(el); setTimeout(() => el.remove(), 2800);
+      } else { setSaveErr(msg || "Could not save."); }
+    } finally { setSaving(false); }
+  };
   const inputCls = "w-full rounded-lg border px-3 py-2 text-sm outline-none transition-colors";
   const inputStyle = { borderColor: "#E6E3D7", background: "#FAFAF7", color: "#171A18" };
 
@@ -713,9 +766,12 @@ function SettingsSection() {
           </div>
         </div>
       </motion.div>
-      <div className="flex items-center justify-end gap-3">
-        <span className="text-xs" style={{ color: "#9A9D94" }}>Connect backend to persist settings.</span>
-        <button onClick={handleSave} className="font-mono text-xs font-bold px-5 py-2.5 rounded-lg text-white transition-all hover:shadow-md" style={{ background: saved ? "#244B35" : "linear-gradient(135deg, #244B35, #1C3D2B)" }}>{saved ? "\u2713 Saved" : "Save changes"}</button>
+      <div className="flex flex-col sm:flex-row items-center justify-end gap-3">
+        <div className="flex flex-col items-end gap-1">
+          {saveErr && <span className="font-mono text-[11px] font-bold" style={{ color: "#B0502F" }}>{saveErr}</span>}
+          {!saveErr && <span className="text-xs" style={{ color: "#9A9D94" }}>{saving ? "Saving…" : saved ? "Saved" : "Edits save to your account."}</span>}
+        </div>
+        <button onClick={handleSave} disabled={saving} className="font-mono text-xs font-bold px-5 py-2.5 rounded-lg text-white transition-all hover:shadow-md disabled:opacity-60" style={{ background: saved ? "#244B35" : "linear-gradient(135deg, #244B35, #1C3D2B)" }}>{saving ? "Saving…" : saved ? "\u2713 Saved" : "Save changes"}</button>
       </div>
     </div>
   );
@@ -730,7 +786,7 @@ export default function FacultyDashboard() {
   const hour = new Date().getHours();
   const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
   const titleMap: Record<string, string> = {
-    overview: "Overview", "skill-intel": "Department Skill Intelligence", demand: "Industry Demand Trends",
+    overview: "Overview", "skill-intel": "Skill Intelligence", demand: "Industry Demand",
     curriculum: "Curriculum Feedback", verification: "Student Verification", opportunities: "Opportunities",
     "curriculum-loop": "Curriculum Loop", analytics: "Analytics", profile: "My Profile", settings: "Settings",
   };
@@ -770,7 +826,8 @@ export default function FacultyDashboard() {
             </div>
             <div className="flex items-center gap-2">
               <div className="hidden sm:flex items-center gap-2 border rounded-xl px-3 py-2 bg-white" style={{ borderColor: "#E6E3D7" }}><Search size={14} style={{ color: "#9A9D94" }} /><input type="text" placeholder="Search students, skills..." className="border-none outline-none bg-transparent text-[13px] w-48" style={{ color: "#171A18" }} /></div>
-              <button className="relative w-9 h-9 rounded-xl border bg-white flex items-center justify-center hover:bg-[#EFEDE3] transition-colors" style={{ borderColor: "#E6E3D7" }}><Bell size={16} /><span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full" style={{ background: "#C98B5F" }} /></button>
+              <PrintButton />
+              <button type="button" aria-label="Notifications" title="Notifications" className="relative w-9 h-9 rounded-xl border bg-white flex items-center justify-center hover:bg-[#EFEDE3] transition-colors" style={{ borderColor: "#E6E3D7" }}><Bell size={16} /><span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full" style={{ background: "#C98B5F" }} /></button>
             </div>
           </motion.div>
           <div className="mt-6">

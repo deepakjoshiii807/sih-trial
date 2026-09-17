@@ -82,7 +82,7 @@ export default function DigiLockerPanel() {
               </p>
 
               <p className="text-[11px] sm:text-[15px] text-gray-500 leading-relaxed mb-3 sm:mb-6 max-w-lg">
-                Lead2Learn integrates with DigiLocker to help students securely access and verify eligible digital documents with user consent, simplifying document management and verification during their career journey.
+                Learn2Lead integrates with DigiLocker to help students securely access and verify eligible digital documents with user consent, simplifying document management and verification during their career journey.
               </p>
 
               <div className="flex flex-wrap gap-2">

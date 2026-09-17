@@ -121,6 +121,19 @@ class ResourceKind(models.TextChoices):
     PROJECT = "Project", "Project"
 
 
+# Re-export Scholarship so `from apps.catalog.models import Scholarship` works
+# and Admin sees it without an extra INSTALLED_APPS entry.
+try:
+    from .scholarship_models import Scholarship, ScholarshipCategory  # noqa: F401
+    __all__ = [  # type: ignore[no-redef]
+        "DemandLevel", "TrendDirection", "Institution", "Department",
+        "SkillCategory", "Skill", "TargetRole", "TargetRoleSkill",
+        "ResourceKind", "LearningResource", "Scholarship", "ScholarshipCategory",
+    ]
+except Exception:  # pragma: no cover - import cycle guard
+    pass
+
+
 class LearningResource(models.Model):
     """A course / workshop / certification that improves one or more skills."""
 

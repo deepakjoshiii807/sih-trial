@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+
+# Demo/preview-only routes — not part of the public product
+Disallow: /student-demo

@@ -1,7 +1,6 @@
 /* DO NOT CHANGE */
 @import "tailwindcss";
 @import "tw-animate-css";
-@custom-variant dark (&:is(.dark *));
 
 /* DO NOT CHANGE */
 @theme inline {
@@ -42,39 +41,40 @@
   --color-sidebar-ring: var(--sidebar-ring);
 }
 
+/* Light-only palette — dark mode has been removed */
 :root {
   --radius: 6px;
-  --background: #0A0A0F;
-  --foreground: #FFFFFF;
-  --card: #0A0A0F;
-  --card-foreground: #FFFFFF;
-  --popover: #0A0A0F;
-  --popover-foreground: #FFFFFF;
-  --primary: #22C55E;
-  --primary-foreground: #0A0A0F;
-  --secondary: rgba(255,255,255,0.06);
-  --secondary-foreground: rgba(255,255,255,0.6);
-  --muted: rgba(255,255,255,0.04);
-  --muted-foreground: rgba(255,255,255,0.4);
-  --accent: #22C55E;
-  --accent-foreground: #0A0A0F;
-  --destructive: #EF4444;
-  --border: rgba(255,255,255,0.06);
-  --input: rgba(255,255,255,0.06);
-  --ring: #22C55E;
-  --chart-1: #22C55E;
-  --chart-2: #3B82F6;
-  --chart-3: #F59E0B;
-  --chart-4: #8B5CF6;
-  --chart-5: #EF4444;
-  --sidebar: #0A0A0F;
-  --sidebar-foreground: #FFFFFF;
-  --sidebar-primary: #22C55E;
-  --sidebar-primary-foreground: #0A0A0F;
-  --sidebar-accent: rgba(255,255,255,0.06);
-  --sidebar-accent-foreground: #FFFFFF;
-  --sidebar-border: rgba(255,255,255,0.06);
-  --sidebar-ring: #22C55E;
+  --background: #F7F6F0;
+  --foreground: #171A18;
+  --card: #FFFFFF;
+  --card-foreground: #171A18;
+  --popover: #FFFFFF;
+  --popover-foreground: #171A18;
+  --primary: #244B35;
+  --primary-foreground: #FFFFFF;
+  --secondary: #EDEBE0;
+  --secondary-foreground: #6B6F68;
+  --muted: #F7F6F0;
+  --muted-foreground: #6B6F68;
+  --accent: #244B35;
+  --accent-foreground: #FFFFFF;
+  --destructive: #C2410C;
+  --border: #E6E3D7;
+  --input: #E6E3D7;
+  --ring: #244B35;
+  --chart-1: #244B35;
+  --chart-2: #8A6FB8;
+  --chart-3: #C98B5F;
+  --chart-4: #B99A22;
+  --chart-5: #6B6F68;
+  --sidebar: #F7F6F0;
+  --sidebar-foreground: #171A18;
+  --sidebar-primary: #244B35;
+  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-accent: #EDEBE0;
+  --sidebar-accent-foreground: #171A18;
+  --sidebar-border: #E6E3D7;
+  --sidebar-ring: #244B35;
 }
 
 @layer base {
@@ -87,8 +87,8 @@
     width: 100%;
     min-height: 100vh;
     overflow-x: hidden;
-    background: #0A0A0F;
-    color: #FFFFFF;
+    background: #F7F6F0;
+    color: #171A18;
   }
   html {
     scroll-behavior: smooth;
@@ -105,12 +105,227 @@
 }
 
 ::selection {
-  background: rgba(34, 197, 94, 0.3);
-  color: #fff;
+  background: rgba(36, 75, 53, 0.18);
+  color: #171A18;
 }
 
 ::-webkit-scrollbar { width: 0; height: 0; }
 
+/* Mobile-only refinements (max-width 767px) — the desktop layout is untouched. */
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+@media (max-width: 767px) {
+  html, body, #root {
+    height: 100%;
+  }
+
+  /* Prevent iOS Safari from auto-zooming when inputs are focused. */
+  input, select, textarea {
+    font-size: 16px;
+  }
+
+  /* Wide dashboard tables collapse into stacked, labelled cards on phones.
+     Tables opt in with the `l2l-table` class plus a per-table label class. */
+  .l2l-table thead { display: none; }
+  .l2l-table tbody, .l2l-table tr, .l2l-table td { width: 100%; }
+  .l2l-table tbody { display: block; }
+  .l2l-table tr {
+    display: block;
+    margin-bottom: 12px;
+    padding: 2px 14px;
+    border: 1px solid #E6E3D7;
+    border-radius: 14px;
+    background: #fff;
+  }
+  .l2l-table tr:hover { background: #fff !important; }
+  .l2l-table td {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-height: 42px;
+    padding: 9px 0 !important;
+    border-bottom: 1px dashed #EDEBE0;
+    text-align: right;
+  }
+  .l2l-table td:last-child { border-bottom: 0; }
+  .l2l-table td::before {
+    content: attr(data-label);
+    flex-shrink: 0;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    text-align: left;
+    color: #9A9D94;
+  }
+  .l2l-table td > span:first-child,
+  .l2l-table td > div:first-child {
+    margin-left: auto;
+  }
+
+  /* Per-table column labels (mirrors each table's <thead>). */
+  .tc-fac-skills td:nth-child(1)::before { content: "Skill"; }
+  .tc-fac-skills td:nth-child(2)::before { content: "Demand"; }
+  .tc-fac-skills td:nth-child(3)::before { content: "Coverage"; }
+  .tc-fac-skills td:nth-child(4)::before { content: "Proficiency"; }
+  .tc-fac-skills td:nth-child(5)::before { content: "Gap"; }
+  .tc-fac-skills td:nth-child(6)::before { content: "Students"; }
+
+  .tc-inst-place td:nth-child(1)::before { content: "Department"; }
+  .tc-inst-place td:nth-child(2)::before { content: "Students"; }
+  .tc-inst-place td:nth-child(3)::before { content: "Placed"; }
+  .tc-inst-place td:nth-child(4)::before { content: "Rate"; }
+  .tc-inst-place td:nth-child(5)::before { content: "Avg Stipend"; }
+  .tc-inst-place td:nth-child(6)::before { content: "Top Company"; }
+
+  .tc-inst-dept td:nth-child(1)::before { content: "Department"; }
+  .tc-inst-dept td:nth-child(2)::before { content: "Students"; }
+  .tc-inst-dept td:nth-child(3)::before { content: "Skills"; }
+  .tc-inst-dept td:nth-child(4)::before { content: "Match"; }
+  .tc-inst-dept td:nth-child(5)::before { content: "Readiness"; }
+  .tc-inst-dept td:nth-child(6)::before { content: "Placement"; }
+  .tc-inst-dept td:nth-child(7)::before { content: "Verified"; }
+  .tc-inst-dept td:nth-child(8)::before { content: "Top Gap"; }
+
+  /* Dashboard shells (all four roots share the inline background #F7F6F0 = rgb
+     below) use `h-screen` + a side-by-side row on desktop. On phones we reflow
+     them to a column (top bar → scrollable content) purely via CSS so the
+     desktop markup/classes stay untouched. */
+  div[class~="h-screen"][style*="247, 246, 240"] {
+    display: flex !important;
+    flex-direction: column !important;
+    height: 100vh !important;
+  }
+  @supports (height: 100dvh) {
+    div[class~="h-screen"][style*="247, 246, 240"] {
+      height: 100dvh !important;
+    }
+  }
+  div[class~="h-screen"][style*="247, 246, 240"] > main {
+    flex: 1 1 0% !important;
+    min-height: 0 !important;
+  }
+}
+
 .noise-overlay {
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* Light card polish: softer shadow, no heavy outline */
+.bg-white.border {
+  border-color: rgba(0,0,0,0.06) !important;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.03) !important;
+}
+.rounded-\[18px\].border,
+.rounded-\[20px\].border {
+  border-color: rgba(0,0,0,0.06) !important;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   SKELETON LOADERS (light-only)
+   ═══════════════════════════════════════════════════════════ */
+.l2l-skeleton {
+  position: relative;
+  overflow: hidden;
+  border-radius: 10px;
+  background: #E9E7DC;
+}
+.l2l-skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.5), transparent);
+  animation: l2l-shimmer 1.4s infinite;
+}
+@keyframes l2l-shimmer {
+  100% { transform: translateX(100%); }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   ACCESSIBILITY
+   ═══════════════════════════════════════════════════════════ */
+:focus-visible {
+  outline: 2px solid #244B35;
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   PRINT — readiness reports
+   When the report modal (#l2l-print-report) is open, printing shows only it.
+   ═══════════════════════════════════════════════════════════ */
+@media print {
+  html, body { background: #fff !important; }
+  body:has(#l2l-print-report) * { visibility: hidden; }
+  body:has(#l2l-print-report) #l2l-print-report,
+  body:has(#l2l-print-report) #l2l-print-report * { visibility: visible; }
+  #l2l-print-report {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    padding: 8px 28px;
+    background: #fff !important;
+    color: #111 !important;
+  }
+  .no-print,
+  .skip-link,
+  nav,
+  [class*="w-[264px]"] { display: none !important; }
+  [class~="h-screen"],
+  main { height: auto !important; max-height: none !important; overflow: visible !important; }
+  @page { margin: 14mm; }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   SKIP LINK — keyboard-only, visible on focus
+   ═══════════════════════════════════════════════════════════ */
+.skip-link {
+  position: fixed;
+  top: 8px;
+  left: 8px;
+  z-index: 200;
+  transform: translateY(-220%);
+  transition: transform 0.15s ease;
+  background: #244B35;
+  color: #F2F7EE;
+  padding: 10px 16px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
+}
+.skip-link:focus {
+  transform: translateY(0);
+  outline: 2px solid #8BD3A6;
+  outline-offset: 2px;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   HIGH-CONTRAST PREFERENCE
+   ═══════════════════════════════════════════════════════════ */
+@media (prefers-contrast: more) {
+  :root {
+    --muted-foreground: #171A18;
+    --border: #D6D0B8;
+  }
 }

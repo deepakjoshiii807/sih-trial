@@ -133,6 +133,12 @@ export interface Application {
   nextStep?: string;
   match: number;
   appliedDate: string;
+  /** Industry user id — lets the student rate the employer (two-way rating). */
+  employerUserId?: number;
+  /** True once the engagement reached offer/joined and can be rated. */
+  rateable?: boolean;
+  /** True if this student already rated the employer for this engagement. */
+  rated?: boolean;
 }
 
 export interface LearningRecommendation {
@@ -178,6 +184,22 @@ export interface StudentDashboard {
   portfolio: PortfolioSummary;
 }
 
+export interface ExtractedSkillItem {
+  name: string;
+  category?: string;
+  confidence?: number;
+  evidence?: string;
+}
+
+export interface ExtractedSkillSaveResult {
+  added: number;
+  upgraded: number;
+  kept: number;
+  evidenceId: string | null;
+  verificationQueued: boolean;
+  items: { name: string; claim: "added" | "upgraded" | "kept"; confidence: number | null }[];
+}
+
 /** "rp-12" / "op-7" → 12 / 7 (backend rows use plain integer pks). */
 function numId(value: string | number, prefix?: string): number {
   if (typeof value === "number") return value;
@@ -215,5 +237,77 @@ export const studentApi = {
   async updateSettings(data: Record<string, unknown>): Promise<void> {
     await apiClient.patch("/settings", data);
     notifyAfterWrite();
+  },
+
+  /** POST /api/student/extracted-skills — persist AI-extracted skills as
+   * evidence-backed claims queued for academician review. */
+  async saveExtractedSkills(payload: {
+    source: string;
+    summary?: string;
+    items: ExtractedSkillItem[];
+  }): Promise<ExtractedSkillSaveResult> {
+    const { data } = await apiClient.post<ExtractedSkillSaveResult>(
+      "/student/extracted-skills",
+      payload,
+    );
+    notifyAfterWrite();
+    return data;
+  },
+
+  /** POST /api/student/ratings — student rates an industry partner (two-way). */
+  async rateEmployer(data: {
+    toId: number;
+    opportunityId: string;
+    score: number;
+    feedback: string;
+  }): Promise<void> {
+    await apiClient.post("/student/ratings", {
+      toId: data.toId,
+      opportunityId: numId(data.opportunityId, "op-"),
+      score: data.score,
+      feedback: data.feedback,
+    });
+    notifyAfterWrite();
+  },
+
+  /** POST /api/student/evidence — upload evidence (JSON or multipart). */
+  async uploadEvidence(payload: {
+    title: string;
+    kind?: string;
+    issuer?: string;
+    description?: string;
+    file?: File;
+    documentText?: string;
+  }): Promise<{ id: string; status: string; extractedSkills: string[] }> {
+    const hasFile = !!payload.file;
+    if (hasFile && payload.file) {
+      const fd = new FormData();
+      fd.append("title", payload.title);
+      fd.append("kind", payload.kind ?? "Certificate");
+      if (payload.issuer) fd.append("issuer", payload.issuer);
+      if (payload.description) fd.append("description", payload.description);
+      fd.append("evidenceFile", payload.file, payload.file.name);
+      if (payload.documentText) fd.append("documentText", payload.documentText);
+      // Let the browser set the multipart boundary; don't force JSON.
+      const { data } = await apiClient.post<{ id: string; status: string; extractedSkills: string[] }>(
+        "/student/evidence",
+        fd as unknown as Record<string, unknown>,
+        { headers: { "Content-Type": "multipart/form-data" } } as never
+      );
+      notifyAfterWrite();
+      return data;
+    }
+    const { data } = await apiClient.post<{ id: string; status: string; extractedSkills: string[] }>(
+      "/student/evidence",
+      {
+        title: payload.title,
+        kind: payload.kind ?? "Certificate",
+        issuer: payload.issuer ?? "",
+        description: payload.description ?? "",
+        documentText: payload.documentText ?? payload.description ?? "",
+      }
+    );
+    notifyAfterWrite();
+    return data;
   },
 };

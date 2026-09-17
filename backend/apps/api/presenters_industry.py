@@ -7,6 +7,7 @@ from datetime import date, datetime, timedelta
 from apps.credentials.models import EvidenceItem, EvidenceKind, SkillClaim
 from apps.credentials.services import compute_readiness, opportunity_match
 from apps.marketplace.models import Application, ApplicationStage, Opportunity, Rating
+from apps.marketplace.sla import application_sla, awaiting_applications, opportunity_sla
 from .presenters_common import fmt_date, fmt_month_year, initials_for, safe_div, stage_label
 
 READINESS_TO_ROLE = {"Job-Ready": "Ready", "Developing": "Almost Ready", "Beginning": "Needs Development"}
@@ -124,41 +125,34 @@ def _opportunity_block(opportunity: Opportunity) -> dict:
         "shortlistedCount": opportunity.shortlisted_count,
         "createdAt": fmt_date(opportunity.created_at),
         "blindShortlisting": opportunity.blind_shortlisting,
+        "slaAwaiting": len(awaiting_applications(opportunity)),
+        "slaBreached": opportunity_sla(opportunity)["breached"],
     }
 
 
 def _sla_blocks(applications) -> list:
-    today = date.today()
     blocks = []
     for app in applications:
         if app.stage not in ("applied", "shortlisted"):
             continue
-        deadline = app.opportunity.deadline
-        if deadline is None:
-            continue
-        remaining = (deadline - today).days
-        if remaining < 0:
-            sla_status = "overdue"
-        elif remaining <= 3:
-            sla_status = "warning"
-        else:
-            sla_status = "on-track"
-        if app.stage == "shortlisted":
-            # review deadlines count from shortlist update
-            remaining = max(remaining, 0)
-            sla_status = sla_status
+        sla = application_sla(app)
         blocks.append(
             {
                 "applicationId": app.id,
                 "candidateName": app.student.display_name,
                 "opportunityTitle": app.opportunity.title,
                 "appliedDate": fmt_date(app.applied_at),
-                "deadline": fmt_date(deadline),
-                "timeRemaining": f"{max(remaining, 0)} day{'s' if remaining != 1 else ''}",
-                "slaStatus": sla_status,
-                "daysRemaining": max(remaining, 0),
+                "respondBy": fmt_date(sla["respondBy"]),
+                "deadline": fmt_date(app.opportunity.deadline),
+                "timeRemaining": sla["timeRemaining"],
+                "slaStatus": sla["slaStatus"],
+                "daysRemaining": sla["daysRemaining"],
             }
         )
+    # Breached first (most urgent), then soonest respond-by.
+    blocks.sort(
+        key=lambda b: (0 if b["slaStatus"] == "breached" else 1, b["daysRemaining"])
+    )
     return blocks[:6]
 
 
@@ -279,11 +273,27 @@ def build_industry_dashboard(company_user) -> dict:
             "student__student_profile", "opportunity"
         )
     )
+    given = Rating.objects.filter(rater=company_user).select_related("opportunity")
+    received = Rating.objects.filter(
+        ratee=company_user, ratee_type="industry"
+    ).select_related("rater", "opportunity")
+    received_blocks = _ratings_block(received)
+    received_count = len(received_blocks)
+    avg_score = (
+        round(sum(r["score"] for r in received_blocks) / received_count, 1)
+        if received_count
+        else 0.0
+    )
     return {
         "company": _company_block(profile),
         "opportunities": [_opportunity_block(o) for o in opportunities],
         "applications": [_application_block(a, a.opportunity.title) for a in applications],
         "slaTrackers": _sla_blocks(applications),
         "analytics": _analytics_block(company_user, opportunities, applications),
-        "ratings": _ratings_block(Rating.objects.filter(rater=company_user).select_related("opportunity")),
+        "ratings": _ratings_block(given),
+        "reputation": {
+            "avgScore": avg_score,
+            "count": received_count,
+            "reviews": received_blocks[:5],
+        },
     }

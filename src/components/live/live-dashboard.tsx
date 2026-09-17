@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 
 import { DashboardError, DashboardLoader } from "@/components/ui/dashboard-state";
+import { DemoFrame } from "@/components/ui/demo-frame";
 import { apiErrorMessage, API_BASE_URL } from "@/lib/api-client";
 import { subscribeDataChanged } from "@/lib/data-events";
 
@@ -18,7 +19,8 @@ export interface LiveDashboardProps<T> {
 type Phase =
   | { status: "loading" }
   | { status: "error"; message: string }
-  | { status: "ready" };
+  | { status: "ready" }
+  | { status: "demo" };
 
 /**
  * Route-level data driver for the four dashboards.
@@ -29,8 +31,9 @@ type Phase =
  *    every section reads server data.
  *  - Refreshes automatically whenever an API module calls notifyDataChanged()
  *    after a successful write (apply, verify, settings save, …).
- *  - Shows a full-screen loader on first load and a retryable error state when
- *    the backend is unreachable (e.g. VITE_API_URL not set / API down).
+ *  - Shows a full-screen loader on first load and, when the backend is
+ *    unreachable (e.g. VITE_API_URL not set / API down), a retryable error
+ *    state that also offers the bundled demo preview as a fallback.
  */
 export function LiveDashboard<T>({ load, hydrate, label, children }: LiveDashboardProps<T>) {
   const [phase, setPhase] = useState<Phase>({ status: "loading" });
@@ -75,8 +78,16 @@ export function LiveDashboard<T>({ load, hydrate, label, children }: LiveDashboa
       <DashboardError
         message={`${phase.message} (${apiHint}) — make sure the Django backend is running and VITE_API_URL points to it.`}
         onRetry={retry}
+        secondaryLabel="Explore the demo preview instead"
+        onSecondary={() => setPhase({ status: "demo" })}
       />
     );
+  }
+
+  // Trial/demo escape hatch: keep exploring on bundled seed data while the API
+  // is unavailable, with the banner making the data source unmistakable.
+  if (phase.status === "demo") {
+    return <DemoFrame onRetry={retry}>{children}</DemoFrame>;
   }
 
   return <>{children}</>;

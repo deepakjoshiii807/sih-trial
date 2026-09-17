@@ -152,9 +152,14 @@ export const institutionApi = {
     return data;
   },
 
-  /** POST /api/institution/anomalies/<pk>/review */
-  async reviewAnomaly(id: string, action: "resolve" | "escalate"): Promise<void> {
-    await apiClient.post(`/institution/anomalies/${numId(id)}/review`, { action });
+  /** POST /api/institution/anomalies/<pk>/review
+   * `note` is stored on the flag as the resolution note — the AI audit verdict
+   * is passed here so the reasoning behind each decision leaves a trail. */
+  async reviewAnomaly(id: string, action: "resolve" | "escalate", note?: string): Promise<void> {
+    await apiClient.post(`/institution/anomalies/${numId(id)}/review`, {
+      action,
+      ...(note ? { note } : {}),
+    });
     notifyAfterWrite();
   },
 

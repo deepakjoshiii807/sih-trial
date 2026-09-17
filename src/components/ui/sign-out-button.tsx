@@ -2,11 +2,11 @@ import { useState } from "react";
 import { Loader2, LogOut } from "lucide-react";
 import { useNavigate } from "react-router";
 
-import { useAuth } from "@/lib/django-auth";
+import { useAuth } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 
 /**
- * Sidebar "Log out" button used by all four dashboards. Clears the Django JWT
+ * Sidebar "Log out" button used by all four dashboards. Ends the Firebase
  * session and returns to /login.
  */
 export function SignOutButton({ open }: { open: boolean }) {

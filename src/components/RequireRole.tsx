@@ -1,25 +1,32 @@
 import { Loader2 } from "lucide-react";
-import { Navigate, useLocation } from "react-router";
+import { Navigate } from "react-router";
 
-import { useAuth } from "@/lib/django-auth";
+import { useAuth } from "@/lib/auth";
 import { apiRoleToProfileRole, roleHome, type ProfileRoleId } from "@/lib/profile-roles";
 
 interface RequireRoleProps {
   /** Which product profile may view this route. */
   role: ProfileRoleId;
   children: React.ReactNode;
+  /**
+   * Trial / presentation mode: what to render when a signed-out visitor hits
+   * this route directly. Typically the dashboard's DemoFrame-wrapped seed-data
+   * build, so manual URL entry never bounces to /login.
+   */
+  demo?: React.ReactNode;
 }
 
 /**
  * Guards a dashboard route:
  *  - auth still restoring      -> centered spinner
- *  - signed out                -> /login?next=<current route>
+ *  - signed out                -> `demo` fallback (trial/presentation mode),
+ *                                 so manually entering the URL never redirects
+ *                                 to the login page
  *  - signed in, wrong profile  -> that profile's own home route
  *  - signed in, correct role   -> renders children
  */
-export default function RequireRole({ role, children }: RequireRoleProps) {
+export default function RequireRole({ role, children, demo }: RequireRoleProps) {
   const { isLoading, isAuthenticated, user } = useAuth();
-  const location = useLocation();
 
   if (isLoading) {
     return (
@@ -33,8 +40,9 @@ export default function RequireRole({ role, children }: RequireRoleProps) {
   }
 
   if (!isAuthenticated || !user) {
-    const next = location.pathname !== "/login" ? `?next=${encodeURIComponent(location.pathname)}` : "";
-    return <Navigate to={`/login${next}`} replace />;
+    // Trial / presentation mode: never force a visitor back to login. Show the
+    // demo build of the dashboard instead (clearly labeled by its DEMO banner).
+    return <>{demo ?? children}</>;
   }
 
   const profileRole = apiRoleToProfileRole(user.role);

@@ -125,6 +125,10 @@ AUTH_PASSWORD_VALIDATORS = [
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
+        # The app authenticates with Firebase ID tokens; Django verifies them and
+        # maps them onto User rows (apps/accounts/firebase_auth.py).
+        "apps.accounts.firebase_auth.FirebaseAuthentication",
+        # Legacy: seeded demo accounts, Django admin and the API test suite.
         "rest_framework_simplejwt.authentication.JWTAuthentication",
         "rest_framework.authentication.SessionAuthentication",
     ),
@@ -167,6 +171,18 @@ USE_TZ = True
 
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
+MEDIA_URL = os.environ.get("MEDIA_URL", "/media/")
+MEDIA_ROOT = Path(os.environ.get("MEDIA_ROOT", str(BASE_DIR / "media")))
+# Max upload for evidence documents (bytes). Guard both the view and nginx.
+EVIDENCE_MAX_UPLOAD_BYTES = int(os.environ.get("EVIDENCE_MAX_UPLOAD_BYTES", str(8 * 1024 * 1024)))
+# Optional cache for cross-replica AI budget/audit (e.g. locmem -> redis via
+# CACHES setting in production). When absent, the in-process fallback is used.
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        "LOCATION": "l2l-default",
+    }
+}
 STORAGES = {
     "default": {
         "BACKEND": "django.core.files.storage.FileSystemStorage",

@@ -14,8 +14,9 @@ import {
   User,
 } from "lucide-react";
 
-import { apiErrorMessage, useAuth, type ApiRole } from "@/lib/django-auth";
+import { authErrorMessage, missingFirebaseVars, useAuth, type ApiRole } from "@/lib/auth";
 import { PROFILE_ROLES, apiRoleToProfileRole, roleForPath, roleHome, type ProfileRoleId } from "@/lib/profile-roles";
+import { usePageMeta } from "@/lib/use-page-meta";
 import { cn } from "@/lib/utils";
 
 type Mode = "login" | "signup";
@@ -40,8 +41,30 @@ function passwordStrength(p: string): number {
   return s;
 }
 
+/** Google "G" mark for the federated sign-in button. */
+function GoogleGlyph() {
+  return (
+    <svg className="h-4 w-4" viewBox="0 0 24 24" aria-hidden="true">
+      <path fill="#4285F4" d="M23.49 12.27c0-.79-.07-1.54-.19-2.27H12v4.51h6.47a5.54 5.54 0 0 1-2.4 3.64v3h3.86c2.26-2.09 3.56-5.17 3.56-8.88z" />
+      <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.86-3c-1.08.72-2.45 1.16-4.07 1.16-3.13 0-5.78-2.11-6.73-4.96H1.29v3.09A11.99 11.99 0 0 0 12 24z" />
+      <path fill="#FBBC05" d="M5.27 14.29a7.2 7.2 0 0 1 0-4.58V6.62H1.29a11.99 11.99 0 0 0 0 10.76l3.98-3.09z" />
+      <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.7 0 3.99 2.47 1.29 6.62l3.98 3.09C6.22 6.86 8.87 4.75 12 4.75z" />
+    </svg>
+  );
+}
+
 export default function AuthSwitch() {
-  const { isLoading, isAuthenticated, user, signIn, signUp } = useAuth();
+  const {
+    isLoading,
+    isAuthenticated,
+    user,
+    isConfigured,
+    needsRole,
+    signIn,
+    signInWithGoogle,
+    signUp,
+    completeProfile,
+  } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -49,11 +72,17 @@ export default function AuthSwitch() {
   const [role, setRole] = useState<ProfileRoleId | null>(null);
   const [showPw, setShowPw] = useState(false);
 
+  usePageMeta(
+    mode === "login" ? `${"Sign in to your account"} — Learn2Lead` : `${"Create your account"} — Learn2Lead`,
+    "Access your Learn2Lead role dashboard — skill passport, opportunities and verification pipeline.",
+  );
+
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [pw, setPw] = useState("");
   const [confirmPw, setConfirmPw] = useState("");
+  const [agree, setAgree] = useState(false);
   const [errs, setErrs] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
 
@@ -67,7 +96,7 @@ export default function AuthSwitch() {
 
   // Signed-in users are sent to their dashboard (or a matching deep link).
   useEffect(() => {
-    if (isLoading || !isAuthenticated || !user) return;
+    if (isLoading || !isAuthenticated || !user || needsRole) return;
     const profile = apiRoleToProfileRole(user.role);
     const dest = profile ? roleHome(profile) : "/login";
     const nextOk = profile && nextParam && roleForPath(nextParam) === profile;
@@ -81,6 +110,7 @@ export default function AuthSwitch() {
     setErrs({});
     setPw("");
     setConfirmPw("");
+    setAgree(false);
     setShowPw(false);
   };
 
@@ -96,7 +126,7 @@ export default function AuthSwitch() {
       await signIn(email, pw);
       // redirect happens via the effect above once `user` is set
     } catch (err) {
-      setErrs({ form: apiErrorMessage(err) });
+      setErrs({ form: authErrorMessage(err) });
     } finally {
       setBusy(false);
     }
@@ -111,6 +141,7 @@ export default function AuthSwitch() {
     if (pw.length < 8) er.pw = "Password must be at least 8 characters.";
     else if (passwordStrength(pw) < 3) er.pw = "Make your password stronger (add uppercase, numbers or symbols).";
     if (pw !== confirmPw) er.cpw = "Passwords don't match.";
+    if (!agree) er.agree = "Please accept the Terms of Service and Privacy Policy to continue.";
     setErrs(er);
     if (Object.keys(er).length) return;
     setBusy(true);
@@ -123,7 +154,40 @@ export default function AuthSwitch() {
         phone: phone.trim(),
       });
     } catch (err) {
-      setErrs({ form: apiErrorMessage(err) });
+      setErrs({ form: authErrorMessage(err) });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  /** Federated Google sign-in (popup, with a redirect fallback). */
+  const submitGoogle = async () => {
+    setErrs({});
+    setBusy(true);
+    try {
+      await signInWithGoogle();
+    } catch (err) {
+      setErrs({ form: authErrorMessage(err) });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  /**
+   * Role cards do double duty: choosing during sign-up, and finishing a
+   * federated (Google) sign-in that arrived without a role.
+   */
+  const pickRole = async (id: ProfileRoleId) => {
+    if (!needsRole) {
+      setRole(id);
+      return;
+    }
+    setErrs({});
+    setBusy(true);
+    try {
+      await completeProfile(API_ROLE[id]);
+    } catch (err) {
+      setErrs({ form: authErrorMessage(err) });
     } finally {
       setBusy(false);
     }
@@ -154,14 +218,14 @@ export default function AuthSwitch() {
       </div>
 
       <Link to="/" className="absolute right-4 top-4 z-20 flex items-center gap-1.5 rounded-full border border-gray-200/80 bg-white/80 px-3.5 py-1.5 text-xs font-medium text-gray-600 backdrop-blur transition-all hover:bg-white hover:text-gray-900 sm:right-8 sm:top-6">
-        <ChevronLeft className="h-3.5 w-3.5" /> Home
+        <ChevronLeft className="h-3.5 w-3.5" /> {"Home"}
       </Link>
 
       <div className="relative z-10 flex items-center gap-2.5 px-5 pt-6 sm:px-8">
         <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-gray-900">
           <span className="text-[9px] font-bold tracking-tight text-white sm:text-[10px]">L2L</span>
         </div>
-        <span className="text-sm font-semibold tracking-tight text-gray-900 sm:text-[15px]">Lead2Learn · AIIA Skills Platform</span>
+        <span className="text-sm font-semibold tracking-tight text-gray-900 sm:text-[15px]">Learn2Lead · AIIA Skills Platform</span>
       </div>
 
       <div className="relative z-10 flex min-h-[calc(100vh-72px)] items-center justify-center px-4 py-8">
@@ -169,12 +233,18 @@ export default function AuthSwitch() {
           <div className="rounded-3xl border border-gray-100 bg-white p-6 shadow-[0_8px_40px_rgba(15,23,42,0.06)] sm:p-7">
             <div className="mb-5 text-center">
               <h1 className="text-[21px] font-bold tracking-tight text-gray-900">
-                {mode === "login" ? "Sign in to your account" : "Create your account"}
+                {needsRole
+                  ? "Choose your profile"
+                  : mode === "login"
+                    ? "Sign in to your account"
+                    : "Create your account"}
               </h1>
               <p className="mt-1 text-sm text-gray-500">
-                {mode === "login"
-                  ? "Access your role dashboard, skill passport and pipeline."
-                  : "Pick your profile, then add your details — one account per role."}
+                {needsRole
+                  ? "You're signed in — pick how you'll use the platform to open your workspace."
+                  : mode === "login"
+                    ? "Access your role dashboard, skill passport and pipeline."
+                    : "Pick your profile, then add your details — one account per role."}
               </p>
             </div>
 
@@ -185,7 +255,37 @@ export default function AuthSwitch() {
               </div>
             )}
 
-            {mode === "login" && (
+            {!isConfigured && (
+              <div className="mb-4 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-[12.5px] leading-relaxed text-amber-800">
+                <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0" />
+                <span>
+                  Firebase Authentication is not configured for this deployment. Add{" "}
+                  <code className="font-mono text-[11px]">{missingFirebaseVars.join(", ")}</code>{" "}
+                  to the project environment and reload.
+                </span>
+              </div>
+            )}
+
+            {!needsRole && (
+              <div className="mb-4">
+                <button
+                  type="button"
+                  onClick={() => void submitGoogle()}
+                  disabled={busy || !isConfigured}
+                  className="flex w-full items-center justify-center gap-2.5 rounded-xl border border-gray-200 bg-white py-3 text-sm font-medium text-gray-700 transition-all hover:bg-gray-50 active:scale-[0.99] disabled:opacity-50"
+                >
+                  {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <GoogleGlyph />}
+                  Continue with Google
+                </button>
+                <div className="mt-4 flex items-center gap-3">
+                  <span className="h-px flex-1 bg-gray-100" />
+                  <span className="text-[11px] font-medium uppercase tracking-wider text-gray-400">or</span>
+                  <span className="h-px flex-1 bg-gray-100" />
+                </div>
+              </div>
+            )}
+
+            {mode === "login" && !needsRole && (
               <form onSubmit={submitLogin} className="space-y-3.5">
                 <div className="space-y-1.5">
                   <label className="text-[13px] font-medium text-gray-600">Email</label>
@@ -215,20 +315,20 @@ export default function AuthSwitch() {
                   <FieldError msg={errs.pw} />
                 </div>
 
-                <button type="submit" disabled={busy} className="flex w-full items-center justify-center gap-2 rounded-xl bg-gray-900 py-3 text-sm font-medium text-white transition-all hover:bg-gray-800 active:scale-[0.99] disabled:opacity-50">
+                <button type="submit" disabled={busy || !isConfigured} className="flex w-full items-center justify-center gap-2 rounded-xl bg-gray-900 py-3 text-sm font-medium text-white transition-all hover:bg-gray-800 active:scale-[0.99] disabled:opacity-50">
                   {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <>Sign in <ArrowRight className="h-4 w-4" /></>}
                 </button>
 
                 <p className="pt-1 text-center text-[13px] text-gray-500">
-                  New to the platform?{" "}
+                  {"New to the platform?"}{" "}
                   <button type="button" onClick={() => reset("signup")} className="font-semibold text-gray-900 hover:underline">
-                    Create an account
+                    {"Create an account"}
                   </button>
                 </p>
               </form>
             )}
 
-            {mode === "signup" && !role && (
+            {(needsRole || (mode === "signup" && !role)) && (
               <div className="space-y-3">
                 <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">Select your profile</p>
                 <div className="grid grid-cols-1 gap-2">
@@ -239,7 +339,7 @@ export default function AuthSwitch() {
                       <button
                         key={r.id}
                         type="button"
-                        onClick={() => setRole(r.id)}
+                        onClick={() => void pickRole(r.id)}
                         className={cn(
                           "flex w-full items-center gap-3 rounded-2xl border-2 bg-white p-3.5 text-left transition-all",
                           selected ? "border-gray-900 shadow-sm" : "border-gray-100 hover:border-gray-200 hover:shadow-sm",
@@ -261,17 +361,19 @@ export default function AuthSwitch() {
                     );
                   })}
                 </div>
-                <p className="pt-1 text-center text-[13px] text-gray-500">
-                  Already registered?{" "}
-                  <button type="button" onClick={() => reset("login")} className="font-semibold text-gray-900 hover:underline">Sign in</button>
-                </p>
+                {!needsRole && (
+                  <p className="pt-1 text-center text-[13px] text-gray-500">
+                    {"Already registered?"}{" "}
+                    <button type="button" onClick={() => reset("login")} className="font-semibold text-gray-900 hover:underline">Sign in</button>
+                  </p>
+                )}
               </div>
             )}
 
-            {mode === "signup" && role && (
+            {mode === "signup" && !!role && !needsRole && (
               <form onSubmit={submitSignup} className="space-y-3">
                 <button type="button" onClick={() => setRole(null)} className="flex items-center gap-1 text-[13px] text-gray-400 transition-colors hover:text-gray-600">
-                  <ChevronLeft className="h-3.5 w-3.5" /> Choose a different profile
+                  <ChevronLeft className="h-3.5 w-3.5" />Choose a different profile
                 </button>
 
                 <div className="flex items-center gap-3">
@@ -332,7 +434,30 @@ export default function AuthSwitch() {
                   <FieldError msg={errs.cpw} />
                 </div>
 
-                <button type="submit" disabled={busy} className="flex w-full items-center justify-center gap-2 rounded-xl bg-gray-900 py-3 text-sm font-medium text-white transition-all hover:bg-gray-800 active:scale-[0.99] disabled:opacity-50">
+                <div className="space-y-1.5">
+                  <label className="flex cursor-pointer select-none items-start gap-2.5">
+                    <input
+                      type="checkbox"
+                      checked={agree}
+                      onChange={(e) => setAgree(e.target.checked)}
+                      className="mt-0.5 h-4 w-4 flex-shrink-0 cursor-pointer rounded border-gray-300 accent-[#171A18]"
+                    />
+                    <span className="text-[12.5px] leading-relaxed text-gray-600">
+                      {"I agree to the"}{" "}
+                      <Link to="/terms" className="font-semibold text-gray-900 underline decoration-gray-300 underline-offset-2 transition-colors hover:decoration-gray-900">
+                        {"Terms of Service"}
+                      </Link> 
+                      and{" "}
+                      <Link to="/privacy" className="font-semibold text-gray-900 underline decoration-gray-300 underline-offset-2 transition-colors hover:decoration-gray-900">
+                        {"Privacy Policy"}
+                      </Link>
+                      .
+                    </span>
+                  </label>
+                  <FieldError msg={errs.agree} />
+                </div>
+
+                <button type="submit" disabled={busy || !isConfigured} className="flex w-full items-center justify-center gap-2 rounded-xl bg-gray-900 py-3 text-sm font-medium text-white transition-all hover:bg-gray-800 active:scale-[0.99] disabled:opacity-50">
                   {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <>Create account <ArrowRight className="h-4 w-4" /></>}
                 </button>
               </form>

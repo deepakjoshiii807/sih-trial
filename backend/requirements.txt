@@ -3,6 +3,8 @@ Django==4.2.16
 djangorestframework==3.15.2
 djangorestframework-simplejwt==5.3.1
 django-cors-headers==4.4.0
+# Verifies the Firebase ID tokens the React app sends (apps/accounts/firebase_auth.py)
+firebase-admin==6.6.0
 # Bundles the IANA timezone database for Asia/Kolkata etc. on hosts without system tzdata
 tzdata==2025.2
 
@@ -11,3 +13,8 @@ gunicorn==23.0.0            # WSGI server
 psycopg[binary]==3.2.9      # PostgreSQL driver (Django >= 4.2 uses psycopg 3 automatically)
 dj-database-url==2.3.0      # DATABASE_URL -> Django settings
 whitenoise==6.9.0           # static files behind the WSGI server (admin assets)
+
+# Document parsing — PDF/DOCX evidence extraction (optional but installed
+# by default so PDFs work on Render/Railway without extra steps)
+pypdf==5.1.0                # pure-python PDF text extraction
+python-docx==1.1.2          # .docx text extraction (no system deps)

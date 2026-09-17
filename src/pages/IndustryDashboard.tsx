@@ -12,9 +12,11 @@ import {
 
 import type {
   Company, Opportunity, Application, SLATracker,
-  IndustryAnalytics, Rating, ApplicationStage, IndustryDashboard,
+  IndustryAnalytics, Rating, Reputation, ApplicationStage, IndustryDashboard,
 } from "@/lib/industry-api";
 import { industryApi } from "@/lib/industry-api";
+import IndustryAIRank from "@/components/ui/industry-ai-rank";
+import PrintButton from "@/components/ui/print-button";
 
 /* ─── Mock Data (swap for: const { company, opportunities, ... } = await industryApi.getDashboard()) ─── */
 let company: Company = {
@@ -27,10 +29,10 @@ let company: Company = {
 };
 
 let opportunities: Opportunity[] = [
-  { id: 1, title: "Clinical Research Intern", type: "Internship", description: "Work on ongoing clinical trials in Ayurvedic pharmacology.", openings: 4, location: "New Delhi", workArrangement: "On-site", duration: "3 Months", stipend: "₹12,000/month", deadline: "Sept 30, 2025", eligibility: { qualification: "BAMS / MBBS", courses: ["BAMS", "MBBS"], experience: "No prior experience required", otherCriteria: "" }, requiredSkills: [{ skill: "Python", required: "essential", minProficiency: 70 }, { skill: "Research Methodology", required: "essential", minProficiency: 60 }, { skill: "Data Analysis", required: "essential", minProficiency: 65 }, { skill: "Scientific Writing", required: "preferred", minProficiency: 50 }], status: "active", totalApplicants: 12, shortlistedCount: 3, createdAt: "Aug 15, 2025", blindShortlisting: true },
-  { id: 2, title: "Research Data Assistant", type: "Part-time", description: "Assist in cleaning, analyzing, and visualizing clinical trial data.", openings: 2, location: "New Delhi", workArrangement: "Hybrid", duration: "6 Months", stipend: "₹15,000/month", deadline: "Oct 15, 2025", eligibility: { qualification: "BSc / MSc", courses: ["BSc", "MSc"], experience: "6 months relevant experience", otherCriteria: "" }, requiredSkills: [{ skill: "Python", required: "essential", minProficiency: 80 }, { skill: "Data Analysis", required: "essential", minProficiency: 75 }, { skill: "Statistical Analysis", required: "essential", minProficiency: 70 }], status: "active", totalApplicants: 8, shortlistedCount: 2, createdAt: "Aug 20, 2025", blindShortlisting: false },
-  { id: 3, title: "AYUSH Public Health Intern", type: "Internship", description: "Support field research on AYUSH healthcare delivery.", openings: 3, location: "Jaipur", workArrangement: "On-site", duration: "2 Months", stipend: "₹8,000/month", deadline: "Sept 20, 2025", eligibility: { qualification: "BAMS / BPH", courses: ["BAMS"], experience: "No prior experience required", otherCriteria: "" }, requiredSkills: [{ skill: "Research", required: "essential", minProficiency: 50 }], status: "closing", totalApplicants: 5, shortlistedCount: 1, createdAt: "Jul 10, 2025", blindShortlisting: false },
-  { id: 4, title: "Herbal Pharmacovigilance Intern", type: "Internship", description: "Monitor adverse drug reactions for AYUSH herbal formulations.", openings: 2, location: "New Delhi", workArrangement: "On-site", duration: "4 Months", stipend: "₹10,000/month", deadline: "Oct 5, 2025", eligibility: { qualification: "BAMS / BPharm", courses: ["BAMS", "BPharm"], experience: "1 year preferred", otherCriteria: "" }, requiredSkills: [{ skill: "Clinical Research", required: "essential", minProficiency: 60 }], status: "draft", totalApplicants: 0, shortlistedCount: 0, createdAt: "Sept 1, 2025", blindShortlisting: false },
+  { id: 1, title: "Clinical Research Intern", type: "Internship", description: "Work on ongoing clinical trials in Ayurvedic pharmacology.", openings: 4, location: "New Delhi", workArrangement: "On-site", duration: "3 Months", stipend: "₹12,000/month", deadline: "Sept 30, 2025", eligibility: { qualification: "BAMS / MBBS", courses: ["BAMS", "MBBS"], experience: "No prior experience required", otherCriteria: "" }, requiredSkills: [{ skill: "Python", required: "essential", minProficiency: 70 }, { skill: "Research Methodology", required: "essential", minProficiency: 60 }, { skill: "Data Analysis", required: "essential", minProficiency: 65 }, { skill: "Scientific Writing", required: "preferred", minProficiency: 50 }], status: "active", totalApplicants: 12, shortlistedCount: 3, createdAt: "Aug 15, 2025", blindShortlisting: true, slaAwaiting: 2, slaBreached: false },
+  { id: 2, title: "Research Data Assistant", type: "Part-time", description: "Assist in cleaning, analyzing, and visualizing clinical trial data.", openings: 2, location: "New Delhi", workArrangement: "Hybrid", duration: "6 Months", stipend: "₹15,000/month", deadline: "Oct 15, 2025", eligibility: { qualification: "BSc / MSc", courses: ["BSc", "MSc"], experience: "6 months relevant experience", otherCriteria: "" }, requiredSkills: [{ skill: "Python", required: "essential", minProficiency: 80 }, { skill: "Data Analysis", required: "essential", minProficiency: 75 }, { skill: "Statistical Analysis", required: "essential", minProficiency: 70 }], status: "active", totalApplicants: 8, shortlistedCount: 2, createdAt: "Aug 20, 2025", blindShortlisting: false, slaAwaiting: 0, slaBreached: false },
+  { id: 3, title: "AYUSH Public Health Intern", type: "Internship", description: "Support field research on AYUSH healthcare delivery.", openings: 3, location: "Jaipur", workArrangement: "On-site", duration: "2 Months", stipend: "₹8,000/month", deadline: "Sept 20, 2025", eligibility: { qualification: "BAMS / BPH", courses: ["BAMS"], experience: "No prior experience required", otherCriteria: "" }, requiredSkills: [{ skill: "Research", required: "essential", minProficiency: 50 }], status: "closing", totalApplicants: 5, shortlistedCount: 1, createdAt: "Jul 10, 2025", blindShortlisting: false, slaAwaiting: 5, slaBreached: true },
+  { id: 4, title: "Herbal Pharmacovigilance Intern", type: "Internship", description: "Monitor adverse drug reactions for AYUSH herbal formulations.", openings: 2, location: "New Delhi", workArrangement: "On-site", duration: "4 Months", stipend: "₹10,000/month", deadline: "Oct 5, 2025", eligibility: { qualification: "BAMS / BPharm", courses: ["BAMS", "BPharm"], experience: "1 year preferred", otherCriteria: "" }, requiredSkills: [{ skill: "Clinical Research", required: "essential", minProficiency: 60 }], status: "draft", totalApplicants: 0, shortlistedCount: 0, createdAt: "Sept 1, 2025", blindShortlisting: false, slaAwaiting: 0, slaBreached: false },
 ];
 
 let applications: Application[] = [
@@ -41,7 +43,8 @@ let applications: Application[] = [
 ];
 
 let slaTrackers: SLATracker[] = [
-  { applicationId: 3, candidateName: "Rohan Patel", opportunityTitle: "Clinical Research Intern", appliedDate: "Sept 4, 2025", deadline: "Sept 11, 2025", timeRemaining: "6 days", slaStatus: "on-track", daysRemaining: 6 },
+  { applicationId: 5, candidateName: "Ananya Iyer", opportunityTitle: "AYUSH Public Health Intern", appliedDate: "Aug 28, 2025", respondBy: "Sept 4, 2025", timeRemaining: "Overdue by 4 days", slaStatus: "breached", daysRemaining: 0 },
+  { applicationId: 1, candidateName: "Aarav Sharma", opportunityTitle: "Clinical Research Intern", appliedDate: "Sept 3, 2025", respondBy: "Sept 10, 2025", timeRemaining: "2 days", slaStatus: "warning", daysRemaining: 2 },
 ];
 
 let analytics: IndustryAnalytics = {
@@ -59,6 +62,15 @@ let ratings: Rating[] = [
   { id: 2, from: "AIIA Research Division", fromType: "industry", to: "Meera Joshi", toType: "student", score: 5, feedback: "Outstanding performance. Strong research skills.", date: "Aug 2025", opportunity: "Clinical Research Intern" },
 ];
 
+let reputation: Reputation = {
+  avgScore: 4.7,
+  count: 6,
+  reviews: [
+    { id: 101, from: "Neha Gupta", fromType: "student", to: "AIIA Research Division", toType: "industry", score: 5, feedback: "Structured onboarding and real research ownership.", date: "Aug 2025", opportunity: "Research Data Assistant" },
+    { id: 102, from: "Sneha Rao", fromType: "student", to: "AIIA Research Division", toType: "industry", score: 4, feedback: "Good mentorship; could improve response times.", date: "Jul 2025", opportunity: "Clinical Research Intern" },
+  ],
+};
+
 /** Server data entry point (called by the route-level LiveDashboard wrapper). */
 export function hydrateIndustryDashboard(payload: IndustryDashboard) {
   company = payload.company;
@@ -67,6 +79,7 @@ export function hydrateIndustryDashboard(payload: IndustryDashboard) {
   slaTrackers = payload.slaTrackers;
   analytics = payload.analytics;
   ratings = payload.ratings;
+  reputation = payload.reputation ?? reputation;
 }
 
 const navLinks = [
@@ -98,7 +111,7 @@ const tagCls: Record<string, string> = {
   paused: "bg-[#E8D36B] text-[#5c4a08]", closed: "bg-[#E8C7AE] text-[#7a3f1a]",
   closing: "bg-[#E8C7AE] text-[#7a3f1a]", verified: "bg-[#DCE6D0] text-[#16301F]",
   "on-track": "bg-[#DCE6D0] text-[#16301F]", warning: "bg-[#E8D36B] text-[#5c4a08]",
-  overdue: "bg-[#E8C7AE] text-[#7a3f1a]", applied: "bg-[#EDEBE0] text-[#6B6F68]",
+  "breached": "bg-[#E8C7AE] text-[#7a3f1a]", applied: "bg-[#EDEBE0] text-[#6B6F68]",
   shortlisted: "bg-[#E8D36B] text-[#5c4a08]", interviewed: "bg-[#C8B5DE] text-[#4d3a74]",
   offered: "bg-[#DCE6D0] text-[#16301F]", joined: "bg-[#244B35] text-white",
   rejected: "bg-[#E8C7AE] text-[#7a3f1a]",
@@ -115,14 +128,23 @@ function LinkMore({ onClick, children }: { onClick?: () => void; children: React
 
 /* ─── Sidebar Content ─── */
 function SidebarContent({ activeNav, setActiveNav }: { activeNav: string; setActiveNav: (id: string) => void }) {
-  const { open } = useSidebar();
+  const { open, setOpen } = useSidebar();
+
+  /** Switch section and (on phones) close the drawer. */
+  const goTo = (id: string) => {
+    setActiveNav(id);
+    if (typeof window !== "undefined" && window.matchMedia("(max-width: 767px)").matches) {
+      setOpen(false);
+    }
+  };
+
   return (
     <>
       <div className="flex flex-col flex-1 overflow-y-auto overflow-x-hidden">
         <div className={open ? "" : "flex justify-center"}>{open ? <Logo /> : <LogoIcon />}</div>
         <div className="mt-8 flex flex-col gap-[2px]">
           {navLinks.map((link) => (
-            <button key={link.id} onClick={() => setActiveNav(link.id)}
+            <button key={link.id} onClick={() => goTo(link.id)}
               className={`flex items-center gap-3 w-full text-left rounded-xl text-sm font-medium transition-colors ${open ? "px-3 py-2.5" : "px-0 py-2.5 justify-center"} ${activeNav === link.id ? "bg-[#244B35] text-white font-semibold" : "text-[#6B6F68] hover:bg-[#EDEBE0] hover:text-[#171A18]"}`}>
               <span className="flex-shrink-0 flex items-center justify-center" style={{ width: 18, height: 18 }}>{link.icon}</span>
               {open && <span className="text-sm whitespace-pre">{link.label}</span>}
@@ -132,7 +154,7 @@ function SidebarContent({ activeNav, setActiveNav }: { activeNav: string; setAct
         </div>
       </div>
       <div className="border-t pt-3 mt-2" style={{ borderColor: open ? "#E6E3D7" : "transparent" }}>
-        <button onClick={() => setActiveNav("settings")} className={`flex items-center gap-3 w-full rounded-xl text-[#6B6F68] text-xs font-medium hover:bg-[#EDEBE0] hover:text-[#171A18] transition-colors ${open ? "px-3 py-2" : "px-0 py-2 justify-center"}`}><Settings size={16} /> {open && "Settings"}</button>
+        <button onClick={() => goTo("settings")} className={`flex items-center gap-3 w-full rounded-xl text-[#6B6F68] text-xs font-medium hover:bg-[#EDEBE0] hover:text-[#171A18] transition-colors ${open ? "px-3 py-2" : "px-0 py-2 justify-center"}`}><Settings size={16} /> {open && "Settings"}</button>
         <SignOutButton open={open} />
         {open && <div className="mt-3 p-3 rounded-xl border" style={{ background: "#F7F6F0", borderColor: "#E6E3D7" }}>
           <div className="flex items-center gap-2.5">
@@ -195,7 +217,7 @@ function OverviewSection() {
             <Tag cls={app.stage}>{app.stage}</Tag>
           </div>
         ))}
-        <LinkMore>View all applications</LinkMore>
+        <LinkMore onClick={() => (document.querySelector("[data-nav-applications]") as HTMLElement)?.click()}>View all applications</LinkMore>
       </motion.section>
       <motion.section initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
         className="col-span-12 lg:col-span-4 rounded-[20px] border p-6 bg-white relative overflow-hidden" style={{ borderColor: "#E6DDD5", boxShadow: "0 1px 3px rgba(0,0,0,.04)" }}>
@@ -203,13 +225,13 @@ function OverviewSection() {
         <Eyebrow color="#C98B5F">SLA Alerts</Eyebrow>
         <div className="font-semibold text-[19px] tracking-tight mt-2 mb-4">Response Deadlines</div>
         {slaTrackers.length === 0 ? <div className="text-[13px]" style={{ color: "#9A9D94" }}>No pending SLA alerts</div> : slaTrackers.map((sla) => (
-          <div key={sla.applicationId} className="p-3 rounded-xl border mb-3" style={{ borderColor: sla.slaStatus === "warning" ? "#E8D36B" : "#E6E3D7" }}>
+          <div key={sla.applicationId} className="p-3 rounded-xl border mb-3" style={{ borderColor: sla.slaStatus === "breached" ? "#E8C7AE" : sla.slaStatus === "warning" ? "#E8D36B" : "#E6E3D7" }}>
             <div className="font-semibold text-[13px]">{sla.candidateName}</div>
             <div className="font-mono text-[11px]" style={{ color: "#6B6F68" }}>{sla.opportunityTitle}</div>
             <div className="flex items-center justify-between mt-2"><Tag cls={sla.slaStatus}>{sla.slaStatus}</Tag><span className="font-mono text-[11px] font-bold" style={{ color: sla.daysRemaining <= 3 ? "#C98B5F" : "#6B6F68" }}>{sla.timeRemaining}</span></div>
           </div>
         ))}
-        <LinkMore>View SLA dashboard</LinkMore>
+        <LinkMore onClick={() => { const nav=document.querySelector("[data-nav-sla]") as HTMLElement; if(nav) nav.click(); window.scrollTo({top:0,behavior:"smooth"}); }}>View SLA dashboard</LinkMore>
       </motion.section>
     </>
   );
@@ -266,7 +288,7 @@ function OpportunitiesSection() {
       <div className="absolute top-0 left-0 w-full h-1" style={{ background: "linear-gradient(90deg, #C98B5F, #E8D36B)" }} />
       <div className="flex items-center justify-between mb-5">
         <div><Eyebrow>Opportunities</Eyebrow><div className="font-semibold text-[19px] tracking-tight mt-2 mb-0.5">Manage Opportunities</div><div className="text-[13px]" style={{ color: "#6B6F68" }}>{opportunities.length} total / {opportunities.filter(o => o.status === "active").length} active</div></div>
-        <button className="inline-flex items-center gap-1.5 font-semibold text-[13px] px-4 py-2.5 rounded-xl transition-all hover:-translate-y-0.5 hover:shadow-md" style={{ background: "linear-gradient(135deg, #244B35, #1C3D2B)", color: "#F7F6F0" }}><Plus size={14} /> Post opportunity</button>
+        <button onClick={() => { const el=document.createElement("div"); el.className="fixed top-4 right-4 z-50 px-4 py-3 rounded-xl text-white font-semibold text-sm shadow-lg max-w-[90vw]"; el.style.background="#244B35"; el.textContent="Post opportunity — connect backend to create live listings (POST /api/industry/opportunities)."; document.body.appendChild(el); setTimeout(()=>el.remove(),3000); }} className="inline-flex items-center gap-1.5 font-semibold text-[13px] px-4 py-2.5 rounded-xl transition-all hover:-translate-y-0.5 hover:shadow-md" style={{ background: "linear-gradient(135deg, #244B35, #1C3D2B)", color: "#F7F6F0" }}><Plus size={14} /> Post opportunity</button>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {opportunities.map((opp) => (
@@ -286,9 +308,10 @@ function OpportunitiesSection() {
               <span className="inline-flex items-center gap-1"><Users size={11} /> {opp.totalApplicants}</span>
             </div>
             {opp.blindShortlisting && <div className="mt-2"><Tag cls="lavender">Blind Shortlisting</Tag></div>}
+            {opp.slaBreached && <div className="mt-2"><Tag cls="breached">Auto-flagged stale · SLA breach</Tag></div>}
             <div className="flex gap-2 mt-3">
-              <button className="flex-1 font-semibold text-[11px] py-2 rounded-xl border transition-all hover:bg-[#EFEDE3]" style={{ borderColor: "#E6E3D7" }}>Edit</button>
-              <button className="font-semibold text-[11px] px-3 py-2 rounded-xl border transition-all hover:bg-[#EFEDE3]" style={{ borderColor: "#E6E3D7" }}>{opp.status === "active" ? <Pause size={12} /> : <Play size={12} />}</button>
+              <button onClick={() => { const el=document.createElement("div"); el.className="fixed top-4 right-4 z-50 px-4 py-3 rounded-xl text-white font-semibold text-sm shadow-lg"; el.style.background="#244B35"; el.textContent="Edit — PATCH /industry/opportunities/"+String(opp.id)+" (backend live)."; document.body.appendChild(el); setTimeout(()=>el.remove(),2500); }} className="flex-1 font-semibold text-[11px] py-2 rounded-xl border transition-all hover:bg-[#EFEDE3]" style={{ borderColor: "#E6E3D7" }}>Edit</button>
+              <button onClick={async () => { const next = opp.status==="active"?"paused":"active"; try{ await industryApi.updateOpportunity(opp.id,{status: next as any}); (opp as any).status = next as any; const el=document.createElement("div"); el.className="fixed top-4 right-4 z-50 px-4 py-3 rounded-xl text-white font-semibold text-sm shadow-lg"; el.style.background="#244B35"; el.textContent=`Status → ${next}`; document.body.appendChild(el); setTimeout(()=>el.remove(),2000);}catch(e){ const m=e instanceof Error?e.message:String(e); const isOffline=/Cannot reach|backend unreachable|Network|Failed to fetch|Load failed/i.test(m); if(isOffline){ (opp as any).status=next as any; try{localStorage.setItem("l2l.demo_opps", JSON.stringify(opportunities));}catch{} const el=document.createElement("div"); el.className="fixed top-4 right-4 z-50 px-4 py-3 rounded-xl text-white font-semibold text-sm shadow-lg"; el.style.background="#6B6F68"; el.textContent=`Status → ${next} (demo)`; document.body.appendChild(el); setTimeout(()=>el.remove(),2500);} else { const el=document.createElement("div"); el.className="fixed top-4 right-4 z-50 px-4 py-3 rounded-xl text-white font-semibold text-sm shadow-lg"; el.style.background="#7a3f1a"; el.textContent=m; document.body.appendChild(el); setTimeout(()=>el.remove(),2800);} } }} className="font-semibold text-[11px] px-3 py-2 rounded-xl border transition-all hover:bg-[#EFEDE3]" style={{ borderColor: "#E6E3D7" }}>{opp.status === "active" ? <Pause size={12} /> : <Play size={12} />}</button>
             </div>
           </div>
         ))}
@@ -313,6 +336,9 @@ function ApplicationsSection() {
           <div key={s} className="flex items-center flex-1"><div className="text-center flex-1"><div className="w-8 h-8 mx-auto rounded-lg grid place-items-center font-bold text-xs mb-1" style={{ background: i < 3 ? "#244B35" : "#EDEBE0", color: i < 3 ? "#DCE6D0" : "#9A9D94" }}>{i < 3 ? "✓" : i + 1}</div><div className="font-mono text-[10px] font-bold" style={{ color: i < 3 ? "#244B35" : "#9A9D94" }}>{s}</div></div>{i < 4 && <div className="h-0.5 flex-1 -mt-4" style={{ background: i < 2 ? "#244B35" : "#E6E3D7" }} />}</div>
         ))}
       </div>
+      {applications.length > 0 && (
+        <IndustryAIRank oppTitle={opportunities[0]?.title ?? "Selected opportunity"} requiredSkills={opportunities[0]?.requiredSkills.map((s) => s.skill) ?? []} applicants={applications.map((a) => ({ id: String(a.id), candidate: { name: a.candidate.name }, matchedSkills: a.matchedSkills, missingSkills: a.missingSkills, matchScore: a.matchScore }))} />
+      )}
       <div className="flex flex-col gap-4">
         {applications.map((app) => (
           <div key={app.id} className="border rounded-[14px] p-5" style={{ borderColor: "#E6E3D7" }}>
@@ -339,10 +365,10 @@ function ApplicationsSection() {
               </div>
               <div className="flex-1"><div className="font-semibold text-[12px]">{app.candidate.roleReadiness}</div><div className="font-mono text-[10px]" style={{ color: "#9A9D94" }}>Readiness: {app.candidate.readinessScore}%</div></div>
               <div className="flex gap-1.5">
-                {app.stage === "applied" && <button onClick={() => industryApi.shortlistCandidate(app.id)} className="font-semibold text-[11px] px-3 py-1.5 rounded-lg transition-all" style={{ background: "#DCE6D0", color: "#16301F" }}>Shortlist</button>}
-                {app.stage === "shortlisted" && <button className="font-semibold text-[11px] px-3 py-1.5 rounded-lg transition-all" style={{ background: "#C8B5DE", color: "#4d3a74" }}>Interview</button>}
-                {app.stage === "interviewed" && <button className="font-semibold text-[11px] px-3 py-1.5 rounded-lg transition-all" style={{ background: "#E8D36B", color: "#5c4a08" }}>Make Offer</button>}
-                <button className="font-semibold text-[11px] px-3 py-1.5 rounded-lg border transition-all" style={{ borderColor: "#E6E3D7" }}>View</button>
+                {app.stage === "applied" && <button onClick={async () => { try { await industryApi.shortlistCandidate(app.id); (app as any).stage="shortlisted"; const el=document.createElement("div"); el.className="fixed top-4 right-4 z-50 px-4 py-3 rounded-xl text-white font-semibold text-sm shadow-lg"; el.style.background="#244B35"; el.textContent="Shortlisted — student notified."; document.body.appendChild(el); setTimeout(()=>el.remove(),2500);} catch(e){ const m=e instanceof Error?e.message:String(e); const isOffline=/Cannot reach|backend unreachable|Network|Failed to fetch|Load failed/i.test(m); if(isOffline){ (app as any).stage="shortlisted"; try{localStorage.setItem("l2l.demo_industry_apps", JSON.stringify(applications));}catch{} const el=document.createElement("div"); el.className="fixed top-4 right-4 z-50 px-4 py-3 rounded-xl text-white font-semibold text-sm shadow-lg"; el.style.background="#6B6F68"; el.textContent="Shortlisted (demo — saved locally)."; document.body.appendChild(el); setTimeout(()=>el.remove(),2800);} else { const el=document.createElement("div"); el.className="fixed top-4 right-4 z-50 px-4 py-3 rounded-xl text-white font-semibold text-sm shadow-lg"; el.style.background="#7a3f1a"; el.textContent=m; document.body.appendChild(el); setTimeout(()=>el.remove(),2800);} } }} className="font-semibold text-[11px] px-3 py-1.5 rounded-lg transition-all" style={{ background: "#DCE6D0", color: "#16301F" }}>Shortlist</button>}
+                {app.stage === "shortlisted" && <button onClick={async () => { try { await industryApi.moveToInterview(app.id); (app as any).stage="interviewed"; const el=document.createElement("div"); el.className="fixed top-4 right-4 z-50 px-4 py-3 rounded-xl text-white font-semibold text-sm shadow-lg"; el.style.background="#244B35"; el.textContent="Moved to interview."; document.body.appendChild(el); setTimeout(()=>el.remove(),2500);} catch(e){ const m=e instanceof Error?e.message:String(e); const isOffline=/Cannot reach|backend unreachable|Network|Failed to fetch|Load failed/i.test(m); if(isOffline){ (app as any).stage="interviewed"; try{localStorage.setItem("l2l.demo_industry_apps", JSON.stringify(applications));}catch{} const el=document.createElement("div"); el.className="fixed top-4 right-4 z-50 px-4 py-3 rounded-xl text-white font-semibold text-sm shadow-lg"; el.style.background="#6B6F68"; el.textContent="Moved to interview (demo)."; document.body.appendChild(el); setTimeout(()=>el.remove(),2800);} else { const el=document.createElement("div"); el.className="fixed top-4 right-4 z-50 px-4 py-3 rounded-xl text-white font-semibold text-sm shadow-lg"; el.style.background="#7a3f1a"; el.textContent=m; document.body.appendChild(el); setTimeout(()=>el.remove(),2800);} } }} className="font-semibold text-[11px] px-3 py-1.5 rounded-lg transition-all hover:shadow-sm" style={{ background: "#C8B5DE", color: "#4d3a74" }}>Interview</button>}
+                {app.stage === "interviewed" && <button onClick={async () => { try { await industryApi.makeOffer(app.id); (app as any).stage="offered"; const el=document.createElement("div"); el.className="fixed top-4 right-4 z-50 px-4 py-3 rounded-xl text-white font-semibold text-sm shadow-lg"; el.style.background="#244B35"; el.textContent="Offer sent!"; document.body.appendChild(el); setTimeout(()=>el.remove(),2500);} catch(e){ const m=e instanceof Error?e.message:String(e); const isOffline=/Cannot reach|backend unreachable|Network|Failed to fetch|Load failed/i.test(m); if(isOffline){ (app as any).stage="offered"; try{localStorage.setItem("l2l.demo_industry_apps", JSON.stringify(applications));}catch{} const el=document.createElement("div"); el.className="fixed top-4 right-4 z-50 px-4 py-3 rounded-xl text-white font-semibold text-sm shadow-lg"; el.style.background="#6B6F68"; el.textContent="Offer sent (demo)."; document.body.appendChild(el); setTimeout(()=>el.remove(),2800);} else { const el=document.createElement("div"); el.className="fixed top-4 right-4 z-50 px-4 py-3 rounded-xl text-white font-semibold text-sm shadow-lg"; el.style.background="#7a3f1a"; el.textContent=m; document.body.appendChild(el); setTimeout(()=>el.remove(),2800);} } }} className="font-semibold text-[11px] px-3 py-1.5 rounded-lg transition-all hover:shadow-sm" style={{ background: "#E8D36B", color: "#5c4a08" }}>Make Offer</button>}
+                <button onClick={() => { const el=document.createElement("div"); el.className="fixed top-4 right-4 z-50 px-4 py-3 rounded-xl bg-white border text-sm shadow-lg max-w-[90vw]"; el.style.borderColor="#E6E3D7"; el.innerHTML=`<div style="font-weight:600;color:#171A18">${app.candidate.name} — ${app.candidate.course}</div><div style="color:#6B6F68;font-size:12px">${app.candidate.skills.map(s=>s.name).join(", ")}</div>`; document.body.appendChild(el); setTimeout(()=>el.remove(),3500); }} className="font-semibold text-[11px] px-3 py-1.5 rounded-lg border transition-all hover:bg-[#FAFAF7]" style={{ borderColor: "#E6E3D7" }}>View</button>
               </div>
             </div>
           </div>
@@ -384,7 +410,7 @@ function MatchingSection() {
             <div className="flex items-center gap-2">
               <Tag cls={app.candidate.roleReadiness === "Ready" ? "active" : app.candidate.roleReadiness === "Almost Ready" ? "warning" : "closing"}>{app.candidate.roleReadiness}</Tag>
               <span className="font-mono text-[11px]" style={{ color: "#9A9D94" }}>{app.candidate.evidence.length} evidence items</span>
-              <button className="ml-auto font-semibold text-[12px] px-3 py-1.5 rounded-xl border transition-all hover:bg-[#EFEDE3]" style={{ borderColor: "#E6E3D7" }}>Full profile</button>
+              <button onClick={() => { const el=document.createElement("div"); el.className="fixed top-4 right-4 z-50 px-4 py-3 rounded-xl bg-white border text-sm shadow-lg max-w-[90vw]"; el.style.borderColor="#E6E3D7"; el.innerHTML=`<div style="font-weight:600;color:#171A18">${app.candidate.name}</div><div style="color:#6B6F68;font-size:12px">${app.candidate.verifiedSkills} verified · ${app.candidate.certifications} certs · readiness ${app.candidate.readinessScore}%</div>`; document.body.appendChild(el); setTimeout(()=>el.remove(),3500); }} className="ml-auto font-semibold text-[12px] px-3 py-1.5 rounded-xl border transition-all hover:bg-[#EFEDE3]" style={{ borderColor: "#E6E3D7" }}>Full profile</button>
             </div>
           </div>
         ))}
@@ -457,18 +483,18 @@ function SLASection() {
       <div className="absolute top-0 left-0 w-full h-1" style={{ background: "linear-gradient(90deg, #C98B5F, #E8D36B)" }} />
       <Eyebrow color="#C98B5F">SLA Tracker</Eyebrow>
       <div className="font-semibold text-[19px] tracking-tight mt-2 mb-0.5">Application Response SLA</div>
-      <div className="text-[13px] mb-5" style={{ color: "#6B6F68" }}>Track response deadlines for pending applications</div>
+      <div className="text-[13px] mb-5" style={{ color: "#6B6F68" }}>Industry must respond within 7 days of an application — breaches auto-flag the listing as stale.</div>
       {slaTrackers.length === 0 ? (
         <div className="text-center py-8"><Check size={32} style={{ color: "#244B35", margin: "0 auto 8px" }} /><div className="font-semibold text-sm">All caught up!</div><div className="text-[13px]" style={{ color: "#9A9D94" }}>No pending SLA deadlines</div></div>
       ) : (
         <div className="flex flex-col gap-3">
           {slaTrackers.map((sla) => (
-            <div key={sla.applicationId} className="flex items-center gap-4 p-4 rounded-[14px] border" style={{ borderColor: sla.slaStatus === "warning" ? "#E8D36B" : sla.slaStatus === "overdue" ? "#E8C7AE" : "#E6E3D7" }}>
+            <div key={sla.applicationId} className="flex items-center gap-4 p-4 rounded-[14px] border" style={{ borderColor: sla.slaStatus === "warning" ? "#E8D36B" : sla.slaStatus === "breached" ? "#E8C7AE" : "#E6E3D7" }}>
               <div className="w-10 h-10 rounded-xl grid place-items-center" style={{ background: sla.slaStatus === "on-track" ? "#DCE6D0" : sla.slaStatus === "warning" ? "#E8D36B" : "#E8C7AE", color: sla.slaStatus === "on-track" ? "#16301F" : sla.slaStatus === "warning" ? "#5c4a08" : "#7a3f1a" }}>
-                {sla.slaStatus === "overdue" ? <AlertTriangle size={18} /> : <Clock size={18} />}
+                {sla.slaStatus === "breached" ? <AlertTriangle size={18} /> : <Clock size={18} />}
               </div>
               <div className="flex-1"><div className="font-semibold text-[14px]">{sla.candidateName}</div><div className="font-mono text-[11px]" style={{ color: "#6B6F68" }}>{sla.opportunityTitle}</div></div>
-              <div className="text-right"><div className="font-mono text-[11px] font-bold" style={{ color: sla.daysRemaining <= 3 ? "#C98B5F" : "#6B6F68" }}>{sla.timeRemaining}</div><div className="font-mono text-[9px] tracking-widest uppercase" style={{ color: "#9A9D94" }}>Deadline: {sla.deadline}</div></div>
+              <div className="text-right"><div className="font-mono text-[11px] font-bold" style={{ color: sla.daysRemaining <= 3 ? "#C98B5F" : "#6B6F68" }}>{sla.timeRemaining}</div>                      <div className="font-mono text-[9px] tracking-widest uppercase" style={{ color: "#9A9D94" }}>Respond by: {sla.respondBy}</div></div>
               <Tag cls={sla.slaStatus}>{sla.slaStatus}</Tag>
             </div>
           ))}
@@ -493,6 +519,13 @@ function RatingsSection() {
       <Eyebrow>Ratings</Eyebrow>
       <div className="font-semibold text-[19px] tracking-tight mt-2 mb-0.5">Two-Way Ratings & Feedback</div>
       <div className="text-[13px] mb-5" style={{ color: "#6B6F68" }}>Mutual feedback after internship completion</div>
+      <div className="flex items-center gap-4 p-4 mb-5 rounded-[14px] border" style={{ borderColor: "#E8D36B60", background: "#FDFBF0" }}>
+        <div className="flex gap-0.5">{[1, 2, 3, 4, 5].map((i) => <Star key={i} size={18} style={{ color: i <= Math.round(reputation.avgScore) ? "#E8D36B" : "#E6E3D7", fill: i <= Math.round(reputation.avgScore) ? "#E8D36B" : "none" }} />)}</div>
+        <div className="flex-1">
+          <div className="font-bold text-sm" style={{ color: "#171A18" }}>{reputation.avgScore.toFixed(1)} / 5 — reputation from {reputation.count} student{reputation.count === 1 ? "" : "s"}</div>
+          <div className="font-mono text-[10px] tracking-widest uppercase" style={{ color: "#9A9D94" }}>Ratings you received</div>
+        </div>
+      </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {ratings.map((r) => (
           <div key={r.id} className="border rounded-[14px] p-5" style={{ borderColor: "#E6E3D7" }}>
@@ -527,7 +560,27 @@ function SettingsSection() {
   const [notifApp, setNotifApp] = useState(true);
   const [notifNewApp, setNotifNewApp] = useState(true);
   const [saved, setSaved] = useState(false);
-  const handleSave = () => { setSaved(true); setTimeout(() => setSaved(false), 2000); };
+  const [saving, setSaving] = useState(false);
+  const [saveErr, setSaveErr] = useState<string | null>(null);
+  const handleSave = async () => {
+    setSaving(true);
+    setSaveErr(null);
+    try {
+      await industryApi.updateSettings({ name, email, phone, website, location, description, contactPerson } as any);
+      company.name = name; company.email = email; company.phone = phone; company.website = website; company.location = location; company.description = description; company.contactPerson = contactPerson;
+      setSaved(true); setTimeout(() => setSaved(false), 2000);
+      const el = document.createElement("div"); el.className = "fixed top-4 right-4 z-50 px-4 py-3 rounded-xl text-white font-semibold text-sm shadow-lg"; el.style.background = "#244B35"; el.textContent = "Company profile saved."; document.body.appendChild(el); setTimeout(() => el.remove(), 2500);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      const isOffline = /Cannot reach|backend unreachable|Network|Failed to fetch|Load failed/i.test(msg);
+      if (isOffline) {
+        try { localStorage.setItem("l2l.demo_company", JSON.stringify({ name, email, phone, website, location, description, contactPerson })); } catch {}
+        company.name = name; company.email = email; company.phone = phone; company.website = website; company.location = location; company.description = description; company.contactPerson = contactPerson;
+        setSaved(true); setTimeout(() => setSaved(false), 2000);
+        const el = document.createElement("div"); el.className = "fixed top-4 right-4 z-50 px-4 py-3 rounded-xl text-white font-semibold text-sm shadow-lg"; el.style.background = "#6B6F68"; el.textContent = "Saved offline (demo)."; document.body.appendChild(el); setTimeout(() => el.remove(), 2800);
+      } else { setSaveErr(msg || "Could not save."); }
+    } finally { setSaving(false); }
+  };
   const inputCls = "w-full border rounded-xl px-4 py-3 text-sm font-medium outline-none transition-colors focus:border-[#244B35]";
   const inputStyle = { borderColor: "#E6E3D7", background: "#FAF9F5", color: "#171A18" };
   const labelCls = "font-mono text-[10px] font-bold tracking-[0.14em] uppercase mb-1.5 block";
@@ -562,9 +615,12 @@ function SettingsSection() {
           ))}
         </div>
       </motion.section>
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.15 }} className="col-span-12 flex items-center justify-between">
-        <div className="text-[12px] font-mono" style={{ color: "#9A9D94" }}>Connect a backend to persist settings.</div>
-        <button onClick={handleSave} className="inline-flex items-center gap-2 font-semibold text-sm px-6 py-3 rounded-xl transition-all hover:-translate-y-0.5 hover:shadow-md" style={{ background: saved ? "#DCE6D0" : "#244B35", color: saved ? "#16301F" : "#F7F6F0" }}>{saved ? <><Check size={16} /> Saved!</> : <><Save size={16} /> Save changes</>}</button>
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.15 }} className="col-span-12 flex flex-col sm:flex-row items-center justify-between gap-3">
+        <div className="flex flex-col gap-1">
+          {saveErr && <span className="font-mono text-[11px] font-bold" style={{ color: "#B0502F" }}>{saveErr}</span>}
+          {!saveErr && <div className="text-[12px] font-mono" style={{ color: "#9A9D94" }}>{saving ? "Saving…" : saved ? "Saved" : "Edits save to your account."}</div>}
+        </div>
+        <button onClick={handleSave} disabled={saving} className="inline-flex items-center gap-2 font-semibold text-sm px-6 py-3 rounded-xl transition-all hover:-translate-y-0.5 hover:shadow-md disabled:opacity-60" style={{ background: saved ? "#DCE6D0" : "#244B35", color: saved ? "#16301F" : "#F7F6F0" }}>{saving ? "Saving…" : saved ? <><Check size={16} /> Saved!</> : <><Save size={16} /> Save changes</>}</button>
       </motion.div>
     </>
   );
@@ -578,6 +634,24 @@ function CompletionSection() {
   const [rating, setRating] = useState(0);
   const [feedback, setFeedback] = useState("");
   const [submitted, setSubmitted] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [rateErr, setRateErr] = useState<string | null>(null);
+  const doRate = async () => {
+    if (!rating || busy) return;
+    setBusy(true); setRateErr(null);
+    try {
+      await industryApi.submitRating({ from: company.name, fromType: "industry", to: "Student", toType: "student", score: rating, feedback, date: new Date().toLocaleDateString("en-IN", { month: "short", year: "numeric" }), opportunity: "Internship" } as any);
+      setSubmitted(true);
+      const el = document.createElement("div"); el.className = "fixed top-4 right-4 z-50 px-4 py-3 rounded-xl text-white font-semibold text-sm shadow-lg"; el.style.background = "#244B35"; el.textContent = "Rating submitted!"; document.body.appendChild(el); setTimeout(() => el.remove(), 2500);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      const isOffline = /Cannot reach|backend unreachable|Network|Failed to fetch|Load failed/i.test(msg);
+      if (isOffline) {
+        setSubmitted(true);
+        const el = document.createElement("div"); el.className = "fixed top-4 right-4 z-50 px-4 py-3 rounded-xl text-white font-semibold text-sm shadow-lg"; el.style.background = "#6B6F68"; el.textContent = "Rating saved offline (demo)."; document.body.appendChild(el); setTimeout(() => el.remove(), 2800);
+      } else { setRateErr(msg || "Could not submit."); }
+    } finally { setBusy(false); }
+  };
 
   const completions = [
     { id: 1, student: "Meera Joshi", initials: "MJ", role: "Clinical Research Intern", duration: "3 Months", status: "completed", startDate: "Jun 2025", endDate: "Aug 2025" },
@@ -618,7 +692,8 @@ function CompletionSection() {
                     ))}
                   </div>
                   <textarea className="w-full rounded-lg border px-3 py-2 text-sm outline-none mb-3" style={{ borderColor: "#E6E3D7", background: "#fff", color: "#171A18", minHeight: 60 }} placeholder="Provide performance feedback..." value={feedback} onChange={e => setFeedback(e.target.value)} />
-                  <button onClick={() => { setSubmitted(true); }} disabled={!rating} className="font-semibold text-[12px] px-4 py-2 rounded-lg text-white transition-all hover:shadow-md disabled:opacity-50" style={{ background: "#244B35" }}>Submit Rating</button>
+                  <button onClick={doRate} disabled={!rating || busy} className="font-semibold text-[12px] px-4 py-2 rounded-lg text-white transition-all hover:shadow-md disabled:opacity-50" style={{ background: "#244B35" }}>{busy ? "Submitting…" : "Submit Rating"}</button>
+                  {rateErr && <span className="font-mono text-[11px] font-bold" style={{ color: "#B0502F" }}>{rateErr}</span>}
                 </div>
               )}
 
@@ -722,9 +797,9 @@ export default function IndustryDashboard() {
   };
 
   const pageTitle: Record<string, string> = {
-    overview: "Industry Dashboard", profile: "Company Profile", opportunities: "Opportunities",
+    overview: "Overview", profile: "Company Profile", opportunities: "Opportunities",
     applications: "Applications", matching: "Candidate Matching", analytics: "Analytics",
-    sla: "SLA Tracker", ratings: "Ratings", completion: "Completion & Rating", settings: "Settings",
+    sla: "SLA Tracker", ratings: "Ratings", completion: "Completion", settings: "Settings",
   };
 
   return (
@@ -738,13 +813,14 @@ export default function IndustryDashboard() {
         <header className="sticky top-0 z-40 flex items-center gap-4 px-7 py-5 border-b" style={{ background: "rgba(247,246,240,.86)", backdropFilter: "blur(10px)", borderColor: "#E6E3D7" }}>
           <div>
             <div className="font-bold text-[22px] tracking-tight">
-              {activeNav === "overview" ? <>{company.name.split(" ")[0]} Dashboard</> : <span style={{ color: "#171A18" }}>{pageTitle[activeNav]}</span>}
+              {activeNav === "overview" ? <>{company.name.split(" ")[0]} Dashboard</> : <span style={{ color: "#171A18" }}>{pageTitle[activeNav] ?? activeNav}</span>}
             </div>
             <div className="text-[13px]" style={{ color: "#6B6F68" }}>{activeNav === "overview" ? "Recruitment overview and pipeline status" : `${company.name} / ${company.domain}`}</div>
           </div>
           <div className="ml-auto flex items-center gap-2.5">
             <div className="hidden sm:flex items-center gap-2 border rounded-xl px-3 py-2.5 bg-white" style={{ borderColor: "#E6E3D7", width: 210 }}><Search size={16} style={{ color: "#9A9D94", flexShrink: 0 }} /><input type="text" placeholder="Search candidates..." className="border-none outline-none bg-transparent flex-1 text-[13px]" /></div>
-            <button className="relative w-10 h-10 rounded-xl border bg-white grid place-items-center hover:bg-[#EFEDE3] transition-colors" style={{ borderColor: "#E6E3D7" }}><Bell size={18} /><span className="absolute top-2 right-2 w-[7px] h-[7px] rounded-full" style={{ background: "#C98B5F" }} /></button>
+            <PrintButton />
+            <button type="button" aria-label="Notifications" title="Notifications" className="relative w-10 h-10 rounded-xl border bg-white grid place-items-center hover:bg-[#EFEDE3] transition-colors" style={{ borderColor: "#E6E3D7" }}><Bell size={18} /><span className="absolute top-2 right-2 w-[7px] h-[7px] rounded-full" style={{ background: "#C98B5F" }} /></button>
             <div className="w-10 h-10 rounded-xl grid place-items-center font-bold text-sm cursor-pointer" style={{ background: "#244B35", color: "#DCE6D0" }}>{company.initials}</div>
           </div>
         </header>

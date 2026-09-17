@@ -1,10 +1,18 @@
 """
-Authentication endpoints:
+Authentication endpoints.
+
+The app authenticates with **Firebase Authentication** (see firebase_auth.py):
+Firebase issues the ID token, Django verifies it and maps it onto a User row.
+
+  GET  /api/auth/me              current user + role summary (Firebase token)
+  POST /api/auth/sync            attach the chosen role/profile to the session
+
+Legacy (kept for the seeded demo accounts and the API test suite — the SPA no
+longer calls these):
   POST /api/auth/register        create account + role profile
   POST /api/auth/token           email + password -> access/refresh (SimpleJWT)
   POST /api/auth/token/refresh   refresh -> new access token
   POST /api/auth/token/verify    validate an access token
-  GET  /api/auth/me              current user + role summary
 """
 from django.db import transaction
 from rest_framework import serializers
@@ -23,6 +31,7 @@ from .models import (
     StudentProfile,
     User,
 )
+from .profiles import ensure_role_profile
 
 
 class RegisterSerializer(serializers.Serializer):
@@ -114,22 +123,73 @@ class RegisterView(APIView):
             )
 
 
+def serialize_me(user) -> dict:
+    """The /auth/me payload — also returned by /auth/sync."""
+    return {
+        "id": user.id,
+        "email": user.email,
+        "name": user.display_name,
+        "initials": user.initials,
+        "role": user.role,
+        "is_verified": user.is_verified,
+        "phone": user.phone,
+        "firebase_linked": bool(user.firebase_uid),
+    }
+
+
 class MeView(APIView):
+    """GET /api/auth/me — the profile behind the Firebase session."""
+
     permission_classes = (IsAuthenticated,)
 
     def get(self, request):
+        return Response(serialize_me(request.user))
+
+
+class SyncSerializer(serializers.Serializer):
+    role = serializers.ChoiceField(choices=Role.choices, required=False)
+    name = serializers.CharField(required=False, allow_blank=True, default="")
+    phone = serializers.CharField(required=False, allow_blank=True, default="")
+
+
+class SyncView(APIView):
+    """
+    POST /api/auth/sync — attach the app-level profile to a Firebase session.
+
+    Called by the client after sign-up (to record the chosen role) and on
+    Google sign-in. Idempotent: the user row is created/linked by
+    FirebaseAuthentication before this view runs, so it only fills in the
+    role/profile details the token cannot carry.
+    """
+
+    permission_classes = (IsAuthenticated,)
+
+    def post(self, request):
+        serializer = SyncSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
         user = request.user
-        return Response(
-            {
-                "id": user.id,
-                "email": user.email,
-                "name": user.display_name,
-                "initials": user.initials,
-                "role": user.role,
-                "is_verified": user.is_verified,
-                "phone": user.phone,
-            }
-        )
+
+        changed = []
+        role = data.get("role")
+        if role and user.role != role:
+            user.role = role
+            changed.append("role")
+        phone = (data.get("phone") or "").strip()
+        if phone and user.phone != phone:
+            user.phone = phone
+            changed.append("phone")
+        name = (data.get("name") or "").strip()
+        if name:
+            first, _, last = name.partition(" ")
+            if user.first_name != first or user.last_name != last.strip():
+                user.first_name, user.last_name = first, last.strip()
+                changed += ["first_name", "last_name"]
+        if changed:
+            user.save(update_fields=changed)
+
+        ensure_role_profile(user)
+        return Response(serialize_me(user))
 
 
 class EmailTokenObtainPairSerializer(TokenObtainPairSerializer):

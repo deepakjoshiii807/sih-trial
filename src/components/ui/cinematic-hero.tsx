@@ -26,7 +26,7 @@ export function CinematicHero({
   tagline1 = "Build the skills,",
   tagline2 = "bridge the gap.",
   cardHeading = "Evidence-backed skill profiles.",
-  cardDescription = <><span className="text-white font-semibold">Lead2Learn</span> connects students with industry through verified skills, semantic matching, and real opportunity discovery.</>,
+  cardDescription = <><span className="text-white font-semibold">Learn2Lead</span> connects students with industry through verified skills, semantic matching, and real opportunity discovery.</>,
   metricValue = 340,
   metricLabel = "Verified Skills",
   ctaHeading = "Start your journey.",
@@ -185,7 +185,7 @@ export function CinematicHero({
             <svg className="w-7 h-7 transition-transform group-hover:scale-105" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
             <div className="text-left">
               <div className="text-[10px] font-bold tracking-wider text-neutral-500 uppercase mb-[-2px]">Get started on</div>
-              <div className="text-xl font-bold leading-none tracking-tight">Lead2Learn</div>
+              <div className="text-xl font-bold leading-none tracking-tight">Learn2Lead</div>
             </div>
           </a>
           <a href="/login" className="btn-modern-dark flex items-center justify-center gap-3 px-8 py-4 rounded-[1.25rem] group focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 focus:ring-offset-[#0A0A0F]">
@@ -228,7 +228,7 @@ export function CinematicHero({
                       <div className="phone-widget flex justify-between items-center mb-8">
                         <div className="flex flex-col">
                           <span className="text-[10px] text-neutral-400 uppercase tracking-widest font-bold mb-1">Dashboard</span>
-                          <span className="text-xl font-bold tracking-tight text-white drop-shadow-md">Lead2Learn</span>
+                          <span className="text-xl font-bold tracking-tight text-white drop-shadow-md">Learn2Lead</span>
                         </div>
                         <div className="w-9 h-9 rounded-full bg-white/5 text-neutral-200 flex items-center justify-center font-bold text-sm border border-white/10 shadow-lg shadow-black/50">L2L</div>
                       </div>

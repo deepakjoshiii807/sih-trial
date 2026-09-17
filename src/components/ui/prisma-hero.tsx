@@ -43,7 +43,7 @@ export const WordsPullUp = ({ text, className = "", showAsterisk = false, style 
 /* ---------------- Hero ---------------- */
 const PrismaHero = () => {
   return (
-    <section className="h-screen w-full relative">
+    <section className="h-dvh w-full relative md:h-screen">
       <div className="relative h-full w-full overflow-hidden rounded-2xl md:rounded-[2rem]">
         
         {/* Background video */}
@@ -64,19 +64,19 @@ const PrismaHero = () => {
 
 
         {/* Hero content */}
-        <div className="absolute bottom-0 left-0 right-0 px-4 pb-2 sm:px-6 md:px-10">
+        <div className="absolute bottom-0 left-0 right-0 px-4 pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:px-6 md:px-10 md:pb-2">
           <div className="grid grid-cols-12 items-end gap-4">
             
             <div className="col-span-12 lg:col-span-8">
               <h1
-                className="leading-[0.85] tracking-[-0.04em] text-[28vw] sm:text-[26vw] md:text-[24vw] lg:text-[22vw] xl:text-[20vw] 2xl:text-[20vw]"
+                className="leading-[0.85] tracking-[-0.04em] text-[24vw] sm:text-[24vw] md:text-[24vw] lg:text-[22vw] xl:text-[20vw] 2xl:text-[20vw]"
                 style={{ color: "#E1E0CC", fontFamily: "'Syne', sans-serif", fontWeight: 800 }}
               >
                 <WordsPullUp text="L2L" />
               </h1>
             </div>
 
-            <div className="col-span-12 flex flex-col gap-5 pb-6 lg:col-span-4 lg:pb-10">
+            <div className="col-span-12 flex flex-col gap-4 pb-6 md:gap-5 lg:col-span-4 lg:pb-10">
               
               <motion.p
                 initial={{ y: 20, opacity: 0 }}
@@ -85,7 +85,7 @@ const PrismaHero = () => {
                 className="text-xs sm:text-sm md:text-base"
                 style={{ lineHeight: 1.3, color: "rgba(225, 224, 204, 0.65)", fontFamily: "'Syne', sans-serif", fontWeight: 400 }}
               >
-                Lead2Learn is a platform for students and young professionals in India to discover courses, scholarships, internships and jobs tailored to their goals, skills and interests.
+                {"Learn2Lead is a platform for students and young professionals in India to discover courses, scholarships, internships and jobs tailored to their goals, skills and interests."}
               </motion.p>
 
               <motion.button
@@ -96,9 +96,7 @@ const PrismaHero = () => {
 
                 className="group inline-flex items-center gap-2 self-start rounded-full py-1.5 pl-6 pr-1.5 text-sm transition-all hover:gap-3 sm:text-base"
                 style={{ fontFamily: "'Syne', sans-serif", fontWeight: 600, backgroundColor: "#E1E0CC", color: "#0A0A0F" }}
-              >
-                Get Started
-                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-black transition-transform group-hover:scale-110 sm:h-10 sm:w-10">
+              >Get Started<span className="flex h-9 w-9 items-center justify-center rounded-full bg-black transition-transform group-hover:scale-110 sm:h-10 sm:w-10">
                   <ArrowRight className="h-4 w-4" style={{ color: "#E1E0CC" }} />
                 </span>
               </motion.button>

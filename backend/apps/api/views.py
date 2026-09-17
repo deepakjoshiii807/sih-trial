@@ -6,9 +6,14 @@ declares so the React app can be pointed at this API with zero reshaping.
 from __future__ import annotations
 
 import hashlib
+import os
+import uuid
 from datetime import datetime
 
-from django.db import transaction
+from django.conf import settings
+from django.core.files.base import ContentFile
+from django.core.files.storage import default_storage
+from django.db import IntegrityError, transaction
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -17,13 +22,16 @@ from rest_framework.views import APIView
 
 from apps.accounts.models import AcademicianProfile, IndustryProfile, InstitutionAdminProfile, StudentProfile, User
 from apps.accounts.permissions import IsAcademician, IsIndustry, IsInstitutionAdmin, IsStudent
-from apps.catalog.models import Department, Institution, LearningResource, Skill, TargetRole
+from apps.catalog.models import Department, Institution, LearningResource, Skill, SkillCategory, TargetRole
 from apps.credentials.models import (
     EvidenceItem,
+    EvidenceStatus,
     ProjectRecommendation,
     ProjectSubmission,
+    SkillClaim,
     VerificationRequest,
 )
+from apps.governance.services import scan_student
 from apps.governance.models import (
     AcademicianOpportunity,
     AnomalyFlag,
@@ -33,6 +41,7 @@ from apps.governance.models import (
 )
 from apps.marketplace.models import Application, ApplicationStage, Opportunity, Rating, OpportunityStatus
 
+from . import ai as ai_service
 from . import presenters_academician as acad
 from . import presenters_industry as ind
 from . import presenters_institution as inst
@@ -152,31 +161,177 @@ class StudentSubmitProjectView(APIView):
         return Response({"id": submission.id, "status": submission.status})
 
 
+def _llm_extract_to_claims(user, evidence, raw_text: str) -> list:
+    """
+    Run the real LLM skill extraction over document text and attach matched
+    taxonomy skills as evidence-backed claims. Returns the names extracted.
+
+    Never raises: any gateway/model failure returns [] so callers fall back to
+    deterministic logic (which keeps the API usable without a VLY key).
+    """
+    extracted = []
+    analysis = None
+    try:
+        analysis = ai_service.extract_skills(
+            raw_text[:14000], evidence.title, user_id=getattr(user, "id", None)
+        )
+    except Exception:  # noqa: BLE001 - best-effort AI, never fail the upload
+        analysis = None
+    if not analysis or not analysis.get("skills"):
+        return extracted
+
+    taxonomy = {s.name.lower(): s for s in Skill.objects.all()}
+    claimed = set()
+    for raw in analysis["skills"]:
+        raw_name = str(raw.get("name") or "").strip()
+        if not raw_name:
+            continue
+        skill = taxonomy.get(raw_name.lower())
+        if skill is None:
+            # Loose containment match so "Python for Healthcare" still lands on
+            # the taxonomy's "Python" rather than creating a duplicate skill.
+            for taxon_name, candidate in taxonomy.items():
+                if taxon_name in raw_name.lower() or raw_name.lower() in taxon_name:
+                    skill = candidate
+                    break
+        if skill is None or skill.name.lower() in claimed:
+            continue
+        claimed.add(skill.name.lower())
+        try:
+            confidence = int(raw.get("confidence") or 70)
+        except (TypeError, ValueError):
+            confidence = 70
+        confidence = max(40, min(90, confidence))
+        claim, _ = user.skill_claims.get_or_create(
+            skill=skill,
+            defaults={"origin": "evidence", "evidence": evidence, "confidence": confidence},
+        )
+        if claim.origin != "evidence" or claim.evidence_id is None:
+            claim.origin = "evidence"
+            claim.evidence = evidence
+            claim.confidence = max(claim.confidence, confidence)
+            claim.save()
+        extracted.append(skill.name)
+    return extracted
+
+
 class StudentEvidenceUploadView(APIView):
     permission_classes = (IsStudent,)
 
     @transaction.atomic
     def post(self, request):
-        """Upload evidence; skills are 'extracted' deterministically for the demo."""
+        """
+        Upload evidence and extract the skills it evidences.
+
+        When document text is available (either supplied as `documentText` or
+        reconstructed from the title/description) the real LLM extraction runs
+        through the server-side gateway. Without a configured VLY key — or if
+        the gateway call fails — a deterministic keyword match over the
+        taxonomy is used so the flow still works in dev/demo.
+
+        Also accepts an optional multipart file field `evidenceFile` (PDFs and
+        text files). When present its server-side extraction takes precedence
+        over any client-provided text — so PDFs work even when the browser
+        cannot read them.
+        """
         title = request.data.get("title") or "Uploaded document"
         kind = request.data.get("kind", "Certificate")
         issuer = request.data.get("issuer", "")
         description = request.data.get("description", "")
+        # Back-compat: some callers send `url` instead of `fileUrl`.
+        file_url = request.data.get("fileUrl", "") or request.data.get("url", "")
+        # Multipart wins over JSON if present — wire the bytes through the
+        # server-side extractor so large PDFs don't need a client round-trip.
+        uploaded_text = None
+        uploaded_file = request.FILES.get("evidenceFile")
+        raw_bytes: bytes | None = None
+        saved_file_url = ""
+        if uploaded_file is not None:
+            # Size guard before reading into memory
+            max_bytes = getattr(settings, "EVIDENCE_MAX_UPLOAD_BYTES", 8 * 1024 * 1024)
+            if getattr(uploaded_file, "size", 0) > max_bytes:
+                return Response(
+                    {"detail": f"File too large — max {max_bytes // (1024*1024)} MB."},
+                    status=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                )
+            try:
+                raw_bytes = uploaded_file.read()
+                if len(raw_bytes) > max_bytes:
+                    return Response(
+                        {"detail": f"File too large — max {max_bytes // (1024*1024)} MB."},
+                        status=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                    )
+                # Persist to MEDIA_ROOT/evidence/<user_id>/ so file_url is real
+                try:
+                    orig_name = getattr(uploaded_file, "name", "document") or "document"
+                    safe_name = os.path.basename(orig_name).replace(" ", "_")[:80] or "document"
+                    # prefix with uuid to avoid collisions
+                    stored_name = f"evidence/{request.user.id}/{uuid.uuid4().hex[:8]}_{safe_name}"
+                    saved_path = default_storage.save(stored_name, ContentFile(raw_bytes))
+                    # Build an absolute URL when possible; fallback to MEDIA_URL
+                    try:
+                        saved_file_url = request.build_absolute_uri(settings.MEDIA_URL + saved_path)
+                    except Exception:
+                        saved_file_url = (settings.MEDIA_URL or "/media/") + saved_path
+                    if not file_url:
+                        file_url = saved_file_url
+                except Exception:
+                    # Storage failure must not break the upload entirely — we still
+                    # have raw_bytes for text extraction
+                    saved_file_url = saved_file_url or ""
+            except Exception:
+                raw_bytes = None
+            try:
+                from .evidence_upload import extract_text_from_upload  # noqa: WPS433
+
+                # Use already-read bytes if available to avoid double read
+                b = raw_bytes if raw_bytes is not None else b""
+                if not b and uploaded_file is not None:
+                    try:
+                        uploaded_file.seek(0)
+                        b = uploaded_file.read()
+                    except Exception:
+                        b = b""
+                text, note = extract_text_from_upload(
+                    getattr(uploaded_file, "name", "") or "document",
+                    getattr(uploaded_file, "content_type", "") or "",
+                    b,
+                )
+                uploaded_text = text
+                if note:
+                    description = (description + " " + note).strip()[:2000]
+            except Exception:  # noqa: BLE001 - file parsing must never break uploads
+                uploaded_text = None
         evidence = EvidenceItem.objects.create(
             student=request.user,
             title=title,
             kind=kind,
             issuer=issuer,
             description=description,
-            file_url=request.data.get("fileUrl", "") or request.data.get("url", ""),
+            file_url=file_url or saved_file_url,
             status="processing",
         )
-        # Deterministic mock of NLP extraction: any taxonomy skill mentioned in
-        # the title/description becomes an evidence-backed claim (pending review).
-        text = f"{title} {description} {issuer}".lower()
-        extracted = []
-        for skill in Skill.objects.all():
-            if skill.name.lower() in text:
+
+        doc_text = request.data.get("documentText") or request.data.get("text") or ""
+        # Best available text: uploaded file extraction > client documentText > metadata.
+        text = f"{title} {description} {issuer}".strip()
+        try:
+            from .evidence_upload import normalise_document_text as _normalise  # noqa: WPS433
+
+            raw_text = _normalise(doc_text, title, description, issuer, uploaded_text)
+        except Exception:
+            raw_text = str(doc_text) if str(doc_text).strip() else text
+            if uploaded_text and len(uploaded_text.strip()) >= 20:
+                raw_text = uploaded_text
+        extracted = _llm_extract_to_claims(request.user, evidence, raw_text)
+
+        if not extracted:
+            # Deterministic fallback: any taxonomy skill mentioned in the
+            # title/description becomes an evidence-backed claim (pending review).
+            haystack = raw_text.lower()
+            for skill in Skill.objects.all():
+                if skill.name.lower() not in haystack:
+                    continue
                 extracted.append(skill.name)
                 claim, _ = request.user.skill_claims.get_or_create(
                     skill=skill, defaults={"origin": "evidence", "evidence": evidence, "confidence": 70}
@@ -185,11 +340,214 @@ class StudentEvidenceUploadView(APIView):
                     claim.evidence = evidence
                     claim.confidence = max(claim.confidence, 70)
                     claim.save()
+
         evidence.extracted_skills = extracted
         evidence.status = "needs review" if extracted else "processing"
         evidence.save(update_fields=["extracted_skills", "status"])
+        try:
+            scan_student(request.user)
+        except Exception:  # noqa: BLE001 - integrity scanning must never break uploads
+            pass
         return Response(
             {"id": f"ev-{evidence.id}", "status": evidence.status, "extractedSkills": extracted},
+            status=201,
+        )
+
+
+class StudentExtractedSkillsView(APIView):
+    """
+    POST /api/student/extracted-skills — persist AI-extracted skills.
+
+    The student dashboard's "AI Skill Extraction" flow used to POST skill
+    fields to /settings, where no backend handler consumed them, so nothing was
+    ever saved. This endpoint stores each extracted skill as an evidence-backed
+    claim under one EvidenceItem per source document, and queues the batch on
+    the academician verification queue (approval there flips claims verified).
+    """
+
+    permission_classes = (IsStudent,)
+    MAX_ITEMS = 50
+
+    EVIDENCE_KIND = "Portfolio"
+    EVIDENCE_ISSUER = "AI document analysis"
+
+    _CATEGORY_MAP = {
+        "technical": SkillCategory.TECHNICAL,
+        "software": SkillCategory.TECHNICAL,
+        "research": SkillCategory.RESEARCH,
+        "communication": SkillCategory.COMMUNICATION,
+        "administrative": SkillCategory.MANAGEMENT,
+        "leadership": SkillCategory.MANAGEMENT,
+        "management": SkillCategory.MANAGEMENT,
+        "clinical": SkillCategory.DOMAIN,
+        "domain": SkillCategory.DOMAIN,
+        "domain-specific": SkillCategory.DOMAIN,
+    }
+
+    @classmethod
+    def _map_category(cls, label) -> str:
+        key = str(label or "").strip().lower()
+        return cls._CATEGORY_MAP.get(key, SkillCategory.DOMAIN)
+
+    @classmethod
+    def _resolve_skill(cls, name: str, category_label: str):
+        """Find the taxonomy skill or create it (category-normalised)."""
+        skill = Skill.objects.filter(name__iexact=name).first()
+        if skill is not None:
+            return skill
+        taxonomy_id = f"SK-{hashlib.md5(name.encode()).hexdigest()[:8].upper()}"
+        try:
+            return Skill.objects.create(
+                name=name,
+                taxonomy_id=taxonomy_id,
+                category=cls._map_category(category_label),
+            )
+        except IntegrityError:
+            # A concurrent request created the same skill first — reuse it.
+            return Skill.objects.get(name__iexact=name)
+
+    @transaction.atomic
+    def post(self, request):
+        data = request.data if isinstance(request.data, dict) else {}
+        items = data.get("items")
+        if not isinstance(items, list) or not items:
+            return Response(
+                {"detail": "items must be a non-empty list of extracted skills."},
+                status=400,
+            )
+
+        source = str(data.get("source") or "document").strip()[:120] or "document"
+        summary = str(data.get("summary") or "").strip()[:2000]
+
+        parsed = []
+        for raw in items[: self.MAX_ITEMS]:
+            if not isinstance(raw, dict):
+                continue
+            name = str(raw.get("name") or "").strip()
+            if not name or len(name) > 160:
+                continue
+            try:
+                confidence = int(raw.get("confidence") or 70)
+            except (TypeError, ValueError):
+                confidence = 70
+            parsed.append(
+                {
+                    "name": name,
+                    "category": str(raw.get("category") or "Domain")[:40],
+                    # Capped below verified levels — an academician approval
+                    # later raises it through the normal review flow.
+                    "confidence": max(40, min(90, confidence)),
+                    "evidence": str(raw.get("evidence") or "").strip()[:500],
+                }
+            )
+        if not parsed:
+            return Response({"detail": "No valid skill names were provided."}, status=400)
+
+        # Phase 1 — decide what actually needs writing (skip already
+        # evidence-backed claims so repeated runs don't spam duplicates).
+        writes = []  # (skill, confidence, evidence_note)
+        kept_names = []
+        for item in parsed:
+            skill = self._resolve_skill(item["name"], item["category"])
+            claim = request.user.skill_claims.filter(skill=skill).first()
+            needs_write = claim is None or claim.origin != "evidence" or claim.evidence_id is None
+            if needs_write:
+                writes.append((skill, item["confidence"]))
+            else:
+                kept_names.append(skill.name)
+
+        if not writes:
+            return Response(
+                {
+                    "added": 0,
+                    "upgraded": 0,
+                    "kept": len(parsed),
+                    "evidenceId": None,
+                    "verificationQueued": False,
+                    "items": [
+                        {"name": n, "claim": "kept", "confidence": None} for n in kept_names
+                    ],
+                },
+                status=200,
+            )
+
+        # Phase 2 — one EvidenceItem per source document, then the claim writes.
+        title = f"AI-extracted skills · {source}"
+        evidence = EvidenceItem.objects.filter(
+            student=request.user,
+            title=title,
+            kind=self.EVIDENCE_KIND,
+            issuer=self.EVIDENCE_ISSUER,
+            description=summary,
+        ).first()
+        if evidence is None:
+            evidence = EvidenceItem.objects.create(
+                student=request.user,
+                title=title,
+                kind=self.EVIDENCE_KIND,
+                issuer=self.EVIDENCE_ISSUER,
+                description=summary,
+                status="needs review",
+            )
+        elif evidence.status == EvidenceStatus.PROCESSING:
+            evidence.status = EvidenceStatus.NEEDS_REVIEW
+            evidence.save(update_fields=["status"])
+
+        added = upgraded = 0
+        items_out = []
+        for skill, confidence in writes:
+            claim = request.user.skill_claims.filter(skill=skill).first()
+            if claim is None:
+                request.user.skill_claims.create(
+                    skill=skill,
+                    origin="evidence",
+                    evidence=evidence,
+                    confidence=confidence,
+                )
+                added += 1
+                state = "added"
+            else:
+                claim.origin = "evidence"
+                claim.evidence = evidence
+                claim.confidence = max(claim.confidence, confidence)
+                claim.save(update_fields=["origin", "evidence", "confidence"])
+                upgraded += 1
+                state = "upgraded"
+            items_out.append(
+                {"name": skill.name, "claim": state, "confidence": max(claim.confidence, confidence) if claim else confidence}
+            )
+        for name in kept_names:
+            items_out.append({"name": name, "claim": "kept", "confidence": None})
+
+        changed_names = [r["name"] for r in items_out if r["claim"] != "kept"]
+        if changed_names:
+            # Land on the academician verification queue: approving the request
+            # flips this evidence (and its claims) to verified.
+            VerificationRequest.objects.get_or_create(
+                student=request.user,
+                evidence=evidence,
+                title=title,
+                defaults={
+                    "type": "Skill Evidence",
+                    "description": summary or f"AI-extracted skills from {source}.",
+                    "skills_claimed": changed_names,
+                    "status": "pending",
+                },
+            )
+
+        try:
+            scan_student(request.user)
+        except Exception:  # noqa: BLE001 - integrity scanning must never break saves
+            pass
+        return Response(
+            {
+                "added": added,
+                "upgraded": upgraded,
+                "kept": len(kept_names),
+                "evidenceId": f"ev-{evidence.id}",
+                "verificationQueued": True,
+                "items": items_out,
+            },
             status=201,
         )
 
@@ -427,15 +785,72 @@ class IndustryRatingCreateView(APIView):
             ratee = User.objects.get(pk=ratee_id, role="student")
         except User.DoesNotExist:
             return Response({"detail": "Student not found."}, status=404)
-        rating = Rating.objects.create(
+        try:
+            score = min(5, max(1, int(request.data.get("score", 5))))
+        except (TypeError, ValueError):
+            return Response({"detail": "score must be 1-5."}, status=400)
+        opportunity_id = request.data.get("opportunityId")
+        rating, created = Rating.objects.update_or_create(
             rater=request.user,
             ratee=ratee,
-            ratee_type="student",
-            score=int(request.data.get("score", 5)),
-            feedback=request.data.get("feedback", ""),
-            opportunity_id=request.data.get("opportunityId"),
+            opportunity_id=opportunity_id or None,
+            defaults={
+                "ratee_type": "student",
+                "score": score,
+                "feedback": request.data.get("feedback", ""),
+            },
         )
-        return Response({"id": rating.id, "created": True}, status=201)
+        return Response({"id": rating.id, "created": created}, status=201)
+
+
+class StudentRatingCreateView(APIView):
+    """POST /api/student/ratings — student rates the industry after an internship."""
+
+    permission_classes = (IsStudent,)
+
+    @transaction.atomic
+    def post(self, request):
+        ratee_id = request.data.get("toId") or request.data.get("rateeId")
+        if not ratee_id:
+            return Response({"detail": "toId (industry user id) is required."}, status=400)
+        opportunity_id = request.data.get("opportunityId")
+        if not opportunity_id:
+            return Response({"detail": "opportunityId is required."}, status=400)
+        try:
+            ratee = User.objects.get(pk=ratee_id, role="industry")
+        except User.DoesNotExist:
+            return Response({"detail": "Industry partner not found."}, status=404)
+
+        # Only rate an engagement the student actually completed.
+        engagement = Application.objects.filter(
+            student=request.user,
+            opportunity_id=opportunity_id,
+            stage__in=("offered", "joined"),
+        ).first()
+        if engagement is None:
+            return Response(
+                {"detail": "You can only rate an internship you completed or were offered."},
+                status=400,
+            )
+        if engagement.opportunity.company_id != ratee.id:
+            return Response({"detail": "Opportunity does not belong to this partner."}, status=400)
+
+        try:
+            score = min(5, max(1, int(request.data.get("score", 5))))
+        except (TypeError, ValueError):
+            return Response({"detail": "score must be 1-5."}, status=400)
+
+        rating, created = Rating.objects.update_or_create(
+            rater=request.user,
+            ratee=ratee,
+            opportunity_id=opportunity_id,
+            defaults={
+                "ratee_type": "industry",
+                "score": score,
+                "feedback": request.data.get("feedback", ""),
+            },
+        )
+        return Response({"id": rating.id, "created": created}, status=201)
 
 
 # ---------------------------------------------------------------------------

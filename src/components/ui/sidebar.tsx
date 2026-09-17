@@ -112,44 +112,81 @@ export const MobileSidebar = ({
   const { open, setOpen } = useSidebar();
   return (
     <>
+      {/* Mobile top bar — sits above the scrollable content column */}
       <div
         className={cn(
-          "h-10 px-4 py-4 flex flex-row md:hidden items-center justify-between w-full",
+          "relative z-40 flex h-14 w-full shrink-0 flex-row items-center justify-between border-b px-4 md:hidden",
+          "bg-[#F7F6F0]/95 backdrop-blur-sm",
         )}
+        style={{ borderColor: "#E6E3D7" }}
         {...props}
       >
-        <div className="flex justify-end z-20 w-full">
-          <Menu
-            className="text-neutral-800 dark:text-neutral-200 cursor-pointer"
-            onClick={() => setOpen(!open)}
-          />
-        </div>
-        <AnimatePresence>
-          {open && (
+        <LogoIcon />
+        <button
+          type="button"
+          aria-label="Open navigation menu"
+          onClick={() => setOpen(true)}
+          className="flex h-10 w-10 items-center justify-center rounded-xl transition-colors hover:bg-[#EDEBE0] active:scale-95"
+        >
+          <Menu className="text-[#171A18]" />
+        </button>
+      </div>
+
+      <AnimatePresence>
+        {open && (
+          <>
+            {/* Scrim behind the drawer */}
             <motion.div
-              initial={{ x: "-100%", opacity: 0 }}
-              animate={{ x: 0, opacity: 1 }}
-              exit={{ x: "-100%", opacity: 0 }}
-              transition={{
-                duration: 0.3,
-                ease: "easeInOut",
-              }}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              onClick={() => setOpen(false)}
+              className="fixed inset-0 z-[95] bg-black/30 backdrop-blur-[1px] md:hidden"
+            />
+            {/* Slide-in drawer */}
+            <motion.div
+              initial={{ x: "-100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: "-100%" }}
+              transition={{ duration: 0.28, ease: [0.32, 0.72, 0, 1] }}
               className={cn(
-                "fixed h-full w-full inset-0 p-10 z-[100] flex flex-col justify-between",
-                className
+                "fixed inset-y-0 left-0 z-[100] flex w-[86%] max-w-[330px] flex-col gap-0 justify-start overflow-hidden bg-[#F7F6F0] shadow-2xl md:hidden",
+                className,
               )}
             >
               <div
-                className=                "absolute right-10 top-10 z-50 cursor-pointer"
-                onClick={() => setOpen(!open)}
+                className="flex h-16 shrink-0 items-center justify-between border-b px-4"
+                style={{ borderColor: "#E6E3D7" }}
               >
-                <X />
+                <span
+                  className="font-semibold text-sm tracking-tight"
+                  style={{ color: "#171A18" }}
+                >
+                  Navigation
+                </span>
+                <button
+                  type="button"
+                  aria-label="Close menu"
+                  onClick={() => setOpen(false)}
+                  className="flex h-10 w-10 items-center justify-center rounded-xl transition-colors hover:bg-[#EDEBE0] active:scale-95"
+                >
+                  <X className="text-[#171A18]" />
+                </button>
               </div>
-              {children}
+              <div
+                className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 pb-6 pt-3"
+                onClick={(e) => {
+                  // Tapping any nav action selects the section and closes the drawer.
+                  if ((e.target as HTMLElement).closest("button")) setOpen(false);
+                }}
+              >
+                {children}
+              </div>
             </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
+          </>
+        )}
+      </AnimatePresence>
     </>
   );
 };
@@ -197,7 +234,7 @@ export const Logo = () => {
         animate={{ opacity: 1 }}
         className="font-semibold text-sm whitespace-pre" style={{ color: "#171A18" }}
       >
-        Lead2Learn
+        Learn2Lead
       </motion.span>
     </div>
   );

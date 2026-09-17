@@ -18,7 +18,7 @@ from apps.credentials.services import (
     simulate_improvements,
     student_target_role,
 )
-from apps.marketplace.models import Application, OpportunityStatus
+from apps.marketplace.models import Application, OpportunityStatus, Rating
 from apps.governance.models import Placement
 from .presenters_common import days_ago_label, fmt_date, fmt_month_year, stage_label
 
@@ -99,6 +99,15 @@ def _application_block(application) -> dict:
         next_step = "Awaiting decision"
     if application.stage == "offered":
         next_step = "Review and accept offer"
+    # Two-way rating: an engagement that reached offer/joined is rateable, and
+    # `rated` tells the UI whether this student already rated the employer.
+    rateable = application.stage in ("offered", "joined")
+    rated = bool(
+        rateable
+        and Rating.objects.filter(
+            rater=student, ratee=opportunity.company, opportunity=opportunity
+        ).exists()
+    )
     return {
         "id": f"ap-{application.id}",
         "opportunityId": f"op-{opportunity.id}",
@@ -110,6 +119,9 @@ def _application_block(application) -> dict:
         "nextStep": next_step or "",
         "match": match["match"],
         "appliedDate": fmt_date(application.applied_at),
+        "employerUserId": opportunity.company_id,
+        "rateable": rateable,
+        "rated": rated,
     }
 
 

@@ -156,7 +156,7 @@ export const SPARK_BADGE_MARKUP = `<!DOCTYPE html>
       </div>
       <div>
         <div class="badge-title">Verified Skills</div>
-        <div class="badge-subtitle">Lead2Learn Credential</div>
+        <div class="badge-subtitle">Learn2Lead Credential</div>
       </div>
     </div>
     <div class="badge-divider"></div>

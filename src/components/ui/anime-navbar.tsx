@@ -37,12 +37,10 @@ export function AnimeNavBar({ items, className, defaultActive = "Home" }: NavBar
   useEffect(() => {
     if (!mounted) return;
 
-    const sectionMap: Record<string, string> = {
-      "#hero": "Home",
-      "#about": "About",
-      "#skills": "Skills",
-      "#features": "Features",
-    };
+    // Anchors -> item name (derived from current items, so translations work)
+    const sectionMap: Record<string, string> = Object.fromEntries(
+      items.filter(i => i.url.startsWith("#")).map(i => [i.url, i.name])
+    );
 
     const sectionIds = Object.keys(sectionMap);
 
@@ -79,7 +77,7 @@ export function AnimeNavBar({ items, className, defaultActive = "Home" }: NavBar
     });
 
     return () => observer.disconnect();
-  }, [mounted, clickedByUser]);
+  }, [mounted, clickedByUser, items]);
 
   // Reset clickedByUser after scroll settles
   useEffect(() => {
@@ -87,6 +85,9 @@ export function AnimeNavBar({ items, className, defaultActive = "Home" }: NavBar
     const timer = setTimeout(() => setClickedByUser(false), 1500);
     return () => clearTimeout(timer);
   }, [clickedByUser]);
+
+  // Keep active tab in sync if defaultActive (translated) changes
+  useEffect(() => { setActiveTab(defaultActive); }, [defaultActive]);
 
   if (!mounted) return null;
 
@@ -130,7 +131,7 @@ export function AnimeNavBar({ items, className, defaultActive = "Home" }: NavBar
                 onMouseEnter={() => setHoveredTab(item.name)}
                 onMouseLeave={() => setHoveredTab(null)}
                 className={cn(
-                  "relative cursor-pointer text-sm font-semibold px-6 py-3 rounded-full transition-all duration-300",
+                  "relative cursor-pointer text-sm font-semibold px-3 py-3 rounded-full transition-all duration-300 sm:px-6",
                   item.highlight
                     ? "bg-primary text-primary-foreground hover:bg-primary/90"
                     : item.isAction

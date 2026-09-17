@@ -54,6 +54,13 @@ class User(AbstractUser):
 
     username = None
     email = models.EmailField("email address", unique=True)
+    # Firebase Authentication uid. Accounts are created client-side; this column
+    # links the Django row to that account on the first authenticated request
+    # (see apps/accounts/firebase_auth.py). NULL for seeded/demo users, which is
+    # why the uniqueness constraint is nullable.
+    firebase_uid = models.CharField(
+        max_length=128, unique=True, null=True, blank=True, default=None
+    )
     role = models.CharField(
         max_length=20,
         choices=Role.choices,
