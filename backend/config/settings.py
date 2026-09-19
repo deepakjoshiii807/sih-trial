@@ -152,14 +152,19 @@ SIMPLE_JWT = {
 }
 
 # --------------------------------------------------------------------------
-# CORS — the Vite dev server (default :5173) plus anything allowed below
+# CORS — accept any origin in production (single-domain deploy via nginx
+# proxy means the frontend is always same-origin). In development the Vite
+# dev server on :5173 needs cross-origin access to the API on :8000.
 # --------------------------------------------------------------------------
 if os.environ.get("CORS_ALLOW_ALL_ORIGINS", "True").lower() in ("1", "true", "yes"):
     CORS_ALLOW_ALL_ORIGINS = True
 else:
     CORS_ALLOWED_ORIGINS = [
         o.strip()
-        for o in os.environ.get("CORS_ALLOWED_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173").split(",")
+        for o in os.environ.get(
+            "CORS_ALLOWED_ORIGINS",
+            "http://localhost:5173,http://127.0.0.1:5173,https://5173-a68b6e90-f41e-4a15-bb41-f4e2999832a5.daytonaproxy01.net,https://100-53-189-145.sslip.io",
+        ).split(",")
         if o.strip()
     ]
 CORS_ALLOW_CREDENTIALS = True

@@ -193,3 +193,102 @@ class InstitutionAdminProfile(models.Model):
 
     class Meta:
         db_table = "accounts_institution_admin_profile"
+
+
+class SkillAssessment(models.Model):
+    """
+    A timed, tab-locked skill assessment generated after AI skill extraction.
+
+    The frontend generates questions via the AI gateway, presents them in a
+    locked full-screen modal, then POSTs the student's answers here. The
+    backend validates timing, grades answers, and records the score.
+    """
+
+    student = models.ForeignKey(User, on_delete=models.CASCADE, related_name="skill_assessments")
+    source_document = models.CharField(max_length=200, blank=True, default="")
+    skills_assessed = models.JSONField(default=list, blank=True)
+    questions = models.JSONField(default=list, blank=True)
+    answers = models.JSONField(default=list, blank=True)
+    score = models.PositiveIntegerField(default=0)
+    total_questions = models.PositiveIntegerField(default=0)
+    time_limit_seconds = models.PositiveIntegerField(default=300)
+    started_at = models.DateTimeField(auto_now_add=True)
+    submitted_at = models.DateTimeField(null=True, blank=True)
+    tab_switches = models.PositiveIntegerField(default=0)
+    status = models.CharField(
+        max_length=20,
+        choices=[("in_progress", "In Progress"), ("submitted", "Submitted"), ("timed_out", "Timed Out")],
+        default="in_progress",
+    )
+
+    class Meta:
+        db_table = "accounts_skill_assessment"
+        ordering = ["-started_at"]
+
+    def __str__(self) -> str:
+        return f"Assessment #{self.pk} for {self.student.email} ({self.status})"
+
+
+class LearningProgress(models.Model):
+    """Tracks which learning recommendations a student has completed,
+    enabling the Skill Gap Closure Tracker feature."""
+
+    student = models.ForeignKey(User, on_delete=models.CASCADE, related_name="learning_progress")
+    resource = models.ForeignKey(
+        "catalog.LearningResource", on_delete=models.CASCADE, related_name="student_progress"
+    )
+    completed_at = models.DateTimeField(auto_now_add=True)
+    notes = models.TextField(blank=True, default="")
+
+    class Meta:
+        db_table = "accounts_learning_progress"
+        unique_together = ("student", "resource")
+        ordering = ["-completed_at"]
+
+    def __str__(self) -> str:
+        return f"{self.student.email} completed {self.resource.title}"
+
+
+class Notification(models.Model):
+    """In-app notifications for all user roles."""
+
+    class NotificationType(models.TextChoices):
+        APPLICATION_STAGE = "application_stage", "Application Stage Change"
+        VERIFICATION = "verification", "Verification Update"
+        SKILL_VERIFIED = "skill_verified", "Skill Verified"
+        PROJECT_REVIEW = "project_review", "Project Review"
+        SLA_BREACH = "sla_breach", "SLA Breach"
+        ASSESSMENT = "assessment", "Assessment"
+        SYSTEM = "system", "System"
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="notifications")
+    notification_type = models.CharField(
+        max_length=30,
+        choices=NotificationType.choices,
+        default=NotificationType.SYSTEM,
+    )
+    title = models.CharField(max_length=200)
+    message = models.TextField(blank=True, default="")
+    link = models.CharField(max_length=300, blank=True, default="")
+    read = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "accounts_notification"
+        ordering = ["-created_at"]
+
+    def __str__(self) -> str:
+        return f"Notification for {self.user.email}: {self.title}"
+
+
+# Helper to create notifications from anywhere
+
+def create_notification(user, notification_type, title, message="", link=""):
+    """Create a notification for a user. Safe to call from any context."""
+    return Notification.objects.create(
+        user=user,
+        notification_type=notification_type,
+        title=title,
+        message=message,
+        link=link,
+    )

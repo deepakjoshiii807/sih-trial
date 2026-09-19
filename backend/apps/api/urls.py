@@ -39,8 +39,12 @@ urlpatterns = [
     path("student/evidence", views.StudentEvidenceUploadView.as_view()),
     path("student/extracted-skills", views.StudentExtractedSkillsView.as_view()),
     path("student/skills", views.StudentAddSkillView.as_view()),
+    path("student/assessment/generate", views.StudentAssessmentGenerateView.as_view()),
+    path("student/assessment/<int:pk>/submit", views.StudentAssessmentSubmitView.as_view()),
     path("student/ratings", views.StudentRatingCreateView.as_view()),
     path("student/scholarships", scholarship_views.StudentScholarshipListView.as_view()),
+    path("student/recommendations/<int:pk>/complete", views.StudentRecommendationCompleteView.as_view()),
+    path("student/progress", views.StudentProgressView.as_view()),
     # ---- Industry -------------------------------------------------------
     path("industry/dashboard", views.IndustryDashboardView.as_view()),
     path("industry/profile", views.IndustryProfileView.as_view()),
@@ -59,4 +63,8 @@ urlpatterns = [
     path("institution/profile", views.InstitutionProfileView.as_view()),
     path("institution/anomalies/<int:pk>/review", views.InstitutionAnomalyReviewView.as_view()),
     path("institution/reports/generate", views.InstitutionReportGenerateView.as_view()),
+    # ---- Notifications ------------------------------------------------
+    path("notifications", views.NotificationListView.as_view()),
+    path("notifications/<int:pk>/read", views.NotificationReadView.as_view()),
+    path("notifications/read-all", views.NotificationReadAllView.as_view()),
 ]

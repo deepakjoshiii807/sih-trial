@@ -22,7 +22,7 @@ import axios, { AxiosError } from "axios";
 const configuredBaseUrl = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/+$/, "");
 
 export const API_BASE_URL =
-  configuredBaseUrl || (import.meta.env.PROD ? "/api" : "http://localhost:8000/api");
+  configuredBaseUrl || "/api";
 
 /** Supplies the bearer token for every request (Firebase ID token). */
 type TokenProvider = () => Promise<string | null>;
