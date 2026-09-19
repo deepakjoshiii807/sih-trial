@@ -184,6 +184,8 @@ def _portfolio_block(student) -> dict:
 
 
 def build_student_dashboard(student) -> dict:
+    from apps.accounts.models import LearningProgress
+
     role = student_target_role(student)
     submissions = {
         s.project_id: s
@@ -219,6 +221,10 @@ def build_student_dashboard(student) -> dict:
     ).select_related("company__industry_profile")
     recommended_qs = [o for o in opportunities_qs if o.id not in application_ids]
 
+    completed_resource_ids = set(
+        LearningProgress.objects.filter(student=student).values_list("resource_id", flat=True)
+    )
+
     return {
         "student": _student_block(student),
         "skillPassport": passport(student),
@@ -229,7 +235,7 @@ def build_student_dashboard(student) -> dict:
         "opportunities": [_opportunity_block(student, o) for o in recommended_qs],
         "applications": [_application_block(a) for a in applications],
         "recommendations": [
-            _recommendation_block(r)
+            {**_recommendation_block(r), "completed": r.pk in completed_resource_ids}
             for r in LearningResource.objects.select_related("closes_gap").order_by("id")
         ],
         "portfolio": _portfolio_block(student),

@@ -1,3 +1,4 @@
+import { NotificationBell } from "@/components/ui/notification-bell";
 import { useState } from "react";
 import { SignOutButton } from "@/components/ui/sign-out-button";
 import { Sidebar, SidebarBody, Logo, LogoIcon, useSidebar } from "@/components/ui/sidebar";
@@ -820,7 +821,7 @@ export default function FacultyDashboard() {
             <div className="flex items-center gap-2">
               <div className="hidden sm:flex items-center gap-2 border rounded-xl px-3 py-2 bg-white" style={{ borderColor: "#E6E3D7" }}><Search size={14} style={{ color: "#9A9D94" }} /><input type="text" placeholder="Search students, skills..." className="border-none outline-none bg-transparent text-[13px] w-48" style={{ color: "#171A18" }} /></div>
               <PrintButton />
-              <button type="button" aria-label="Notifications" title="Notifications" className="relative w-9 h-9 rounded-xl border bg-white flex items-center justify-center hover:bg-[#EFEDE3] transition-colors" style={{ borderColor: "#E6E3D7" }}><Bell size={16} /><span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full" style={{ background: "#C98B5F" }} /></button>
+              <NotificationBell />
             </div>
           </motion.div>
           <div className="mt-6">

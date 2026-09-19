@@ -151,6 +151,7 @@ export interface LearningRecommendation {
   rating: number;
   why: string;
   projectedImprovement: number;
+  completed?: boolean;
 }
 
 export interface PortfolioProject {
@@ -160,6 +161,14 @@ export interface PortfolioProject {
   skills: string[];
   date: string;
   evidenceId?: string;
+}
+
+export interface StudentProgress {
+  totalGaps: number;
+  closedGaps: number;
+  completionRate: number;
+  completedResources: number[];
+  gaps: SkillGap[];
 }
 
 export interface PortfolioSummary {
@@ -189,6 +198,26 @@ export interface ExtractedSkillItem {
   category?: string;
   confidence?: number;
   evidence?: string;
+}
+
+export interface GradedQuestion {
+  skill: string;
+  question: string;
+  options: string[];
+  correctIndex: number;
+  userAnswer: number;
+  correct: boolean;
+  explanation: string;
+}
+
+export interface AssessmentResult {
+  id: number;
+  score: number;
+  totalQuestions: number;
+  percentage: number;
+  tabSwitches: number;
+  gradedQuestions: GradedQuestion[];
+  passed: boolean;
 }
 
 export interface ExtractedSkillSaveResult {
@@ -254,6 +283,19 @@ export const studentApi = {
     return data;
   },
 
+  /** Assessment result returned by POST /api/student/assessment/<pk>/submit */
+  async generateAssessment(skills: string[], source: string): Promise<{ id: number; questions: { skill: string; question: string; options: string[]; correctIndex: number; explanation: string }[]; totalQuestions: number; timeLimitSeconds: number; startedAt: string }> {
+    const { data } = await apiClient.post<AssessmentResult>("/student/assessment/generate", { skills, source });
+    // The generate endpoint returns AssessmentShape, not AssessmentResult;
+    // map it into the shape the modal expects.
+    return data as unknown as { id: number; questions: { skill: string; question: string; options: string[]; correctIndex: number; explanation: string }[]; totalQuestions: number; timeLimitSeconds: number; startedAt: string };
+  },
+
+  async submitAssessment(id: number, answers: number[], tabSwitches: number): Promise<AssessmentResult> {
+    const { data } = await apiClient.post<AssessmentResult>(`/student/assessment/${id}/submit`, { answers, tabSwitches });
+    return data;
+  },
+
   /** POST /api/student/ratings — student rates an industry partner (two-way). */
   async rateEmployer(data: {
     toId: number;
@@ -271,6 +313,20 @@ export const studentApi = {
   },
 
   /** POST /api/student/evidence — upload evidence (JSON or multipart). */
+  /** POST /api/student/recommendations/<pk>/complete */
+  async completeRecommendation(recommendationId: string): Promise<{ id: string; resourceId: string; title: string; closesGap: string; completedAt: string; created: boolean }> {
+    const pk = numId(recommendationId, "rc-");
+    const { data } = await apiClient.post(`/student/recommendations/${pk}/complete`);
+    notifyAfterWrite();
+    return data;
+  },
+
+  /** GET /api/student/progress */
+  async getProgress(): Promise<StudentProgress> {
+    const { data } = await apiClient.get<StudentProgress>("/student/progress");
+    return data;
+  },
+
   async uploadEvidence(payload: {
     title: string;
     kind?: string;

@@ -96,5 +96,18 @@ export default defineConfig({
     hmr: {
       overlay: false,
     },
+    // Proxy /api to the backend in local dev (VITE_API_PROXY env var).
+    // In production, nginx handles this — the proxy is never used.
+    ...(process.env.VITE_API_PROXY
+      ? {
+          proxy: {
+            "/api": {
+              target: process.env.VITE_API_PROXY,
+              changeOrigin: true,
+              secure: process.env.VITE_API_PROXY.startsWith("https"),
+            },
+          },
+        }
+      : {}),
   },
 });

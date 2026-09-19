@@ -1,3 +1,4 @@
+import { NotificationBell } from "@/components/ui/notification-bell";
 import { useState } from "react";
 import { SignOutButton } from "@/components/ui/sign-out-button";
 import { Sidebar, SidebarBody, Logo, LogoIcon, useSidebar } from "@/components/ui/sidebar";
@@ -852,7 +853,7 @@ export default function IndustryDashboard() {
           <div className="ml-auto flex items-center gap-2.5">
             <div className="hidden sm:flex items-center gap-2 border rounded-xl px-3 py-2.5 bg-white" style={{ borderColor: "#E6E3D7", width: 210 }}><Search size={16} style={{ color: "#9A9D94", flexShrink: 0 }} /><input type="text" placeholder="Search candidates..." className="border-none outline-none bg-transparent flex-1 text-[13px]" /></div>
             <PrintButton />
-            <button type="button" aria-label="Notifications" title="Notifications" className="relative w-10 h-10 rounded-xl border bg-white grid place-items-center hover:bg-[#EFEDE3] transition-colors" style={{ borderColor: "#E6E3D7" }}><Bell size={18} /><span className="absolute top-2 right-2 w-[7px] h-[7px] rounded-full" style={{ background: "#C98B5F" }} /></button>
+            <NotificationBell />
             <div className="w-10 h-10 rounded-xl grid place-items-center font-bold text-sm cursor-pointer" style={{ background: "#244B35", color: "#DCE6D0" }}>{company.initials}</div>
           </div>
         </header>

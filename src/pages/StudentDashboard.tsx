@@ -17,6 +17,7 @@ import {
 import { RadarChart, PolarGrid, PolarAngleAxis, Radar, ResponsiveContainer, Tooltip } from "recharts";
 
 import EmptyState from "@/components/ui/empty-state";
+import { NotificationBell } from "@/components/ui/notification-bell";
 import MobileTabBar from "@/components/ui/mobile-tab-bar";
 import OnboardingWizard, { ONBOARDING_ROLES } from "@/components/ui/onboarding-wizard";
 import ReadinessReportModal from "@/components/ui/readiness-report";
@@ -28,13 +29,13 @@ import ProfileOptimizerPanel from "@/components/ui/profile-optimizer-panel";
 import ScholarshipPanel from "@/components/ui/scholarship-panel";
 import { enrichOpportunityMatch, type EnrichedMatch } from "@/lib/ai-opportunity-matcher";
 import { ModelDisclaimer } from "@/components/ui/ai-provenance";
+import { studentApi } from "@/lib/student-api";
 import type {
   Student, SkillPassportItem, SkillGap, RoleReadinessProfile,
   SimulatorAction, RecommendedProject, Opportunity, Application,
   LearningRecommendation, PortfolioProject, EvidenceItem,
 } from "@/lib/student-api";
 import type { PortfolioSummary, SkillPassport, StudentDashboard } from "@/lib/student-api";
-import { studentApi } from "@/lib/student-api";
 
 /* ─── Mock Data ─── */
 let student: Student = { id: "st-1", name: "Aarav Sharma", initials: "AS", email: "aarav.sharma@aiia.ac.in", phone: "+91 98765 43210", bio: "Third-year BAMS student with a strong interest in clinical research and evidence-based medicine.", institution: "All India Institute of Ayurveda", course: "BAMS", department: "Ayurveda Medicine", year: "3rd Year", graduationYear: 2027, location: "New Delhi", targetRole: "Clinical Research Intern", profileCompletion: 82 };
@@ -99,6 +100,9 @@ let portfolioData: PortfolioSummary = { projects: 4, certificates: 6, verifiedSk
   { id: "pf-2", title: "CVD Risk Prediction Model", description: "ML model predicting cardiovascular risk from Ayurvedic markers", skills: ["Machine Learning", "Python"], date: "Jun 2025" },
   { id: "pf-3", title: "Herbal Safety Database", description: "Searchable database of 200+ herb-drug interactions", skills: ["Data Analysis", "Documentation"], date: "Apr 2025" },
 ] };
+
+/** Set of recommendation resource IDs that the student has already completed. */
+let completedIds = new Set<string>();
 
 /** Server data entry point (called by the route-level LiveDashboard wrapper). */
 export function hydrateStudentDashboard(payload: StudentDashboard) {
@@ -1174,8 +1178,78 @@ function ApplicationsSection({ onNavigate }: { onNavigate?: (id: string) => void
    RECOMMENDATIONS SECTION
    ═══════════════════════════════════════════════════════ */
 function RecommendationsSection({ onNavigate }: { onNavigate?: (id:string)=>void } = {}) {
+  const [completed, setCompleted] = React.useState<Set<string>>(() => {
+    const ids = new Set<string>();
+    recommendations.forEach((r) => { if (r.completed) ids.add(r.id); });
+    return ids;
+  });
+  const [completingId, setCompletingId] = React.useState<string | null>(null);
+
+  const totalGaps = gaps.length;
+  const closedGaps = new Set(
+    recommendations
+      .filter((r) => completed.has(r.id) && r.closesGap)
+      .map((r) => r.closesGap),
+  ).size;
+  const completionRate = totalGaps > 0 ? Math.round((closedGaps / totalGaps) * 100) : 0;
+
+  const handleComplete = async (recId: string) => {
+    setCompletingId(recId);
+    try {
+      await studentApi.completeRecommendation(recId);
+      setCompleted((prev) => new Set([...prev, recId]));
+      completedIds.add(recId);
+    } catch {
+      // Silently handle
+    } finally {
+      setCompletingId(null);
+    }
+  };
+
   return (
     <div className="flex flex-col gap-5">
+      {/* Progress Tracker */}
+      {totalGaps > 0 && (
+        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="rounded-[18px] border p-6 bg-white" style={{ borderColor: "#E6E3D7", boxShadow: "0 1px 3px rgba(0,0,0,.04)" }}>
+          <div className="absolute top-0 left-0 w-full h-1" style={{ background: "linear-gradient(90deg, #244B35, #4CAF50)" }} />
+          <Eyebrow color="#244B35">Gap Closure Progress</Eyebrow>
+          <div className="font-semibold text-[18px] tracking-tight mt-2 mb-3">Your Skill Gap Journey</div>
+          <div className="flex items-center gap-6 mb-4">
+            <div className="flex-1">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-medium" style={{ color: "#6B6F68" }}>{closedGaps} of {totalGaps} gaps closed</span>
+                <span className="font-mono text-sm font-bold" style={{ color: "#244B35" }}>{completionRate}%</span>
+              </div>
+              <div className="h-3 rounded-full overflow-hidden" style={{ background: "#EDEBE0" }}>
+                <motion.div
+                  initial={{ width: 0 }}
+                  animate={{ width: `${completionRate}%` }}
+                  transition={{ duration: 0.8, ease: "easeOut" }}
+                  className="h-full rounded-full"
+                  style={{ background: "linear-gradient(90deg, #244B35, #4CAF50)" }}
+                />
+              </div>
+            </div>
+            <div className="text-center">
+              <div className="font-bold text-3xl" style={{ color: "#244B35" }}>{completed.size}</div>
+              <div className="font-mono text-[10px] tracking-widest uppercase" style={{ color: "#6B6F68" }}>Completed</div>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {gaps.map((g) => {
+              const isClosed = recommendations.some((r) => r.closesGap === g.name && completed.has(r.id));
+              return (
+                <span key={g.id} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium" style={{ background: isClosed ? "#DCE6D0" : "#EDEBE0", color: isClosed ? "#16301F" : "#6B6F68" }}>
+                  {isClosed && <Check size={12} style={{ color: "#244B35" }} />}
+                  {g.name}
+                </span>
+              );
+            })}
+          </div>
+        </motion.div>
+      )}
+
+      {/* Recommendations Grid */}
       <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="rounded-[18px] border p-6 bg-white" style={{ borderColor: "#E6E3D7", boxShadow: "0 1px 3px rgba(0,0,0,.04)" }}>
         <div className="absolute top-0 left-0 w-full h-1" style={{ background: "linear-gradient(90deg, #8A6FB8, #C8B5DE)" }} />
         <Eyebrow color="#8A6FB8">Learning Recommendations</Eyebrow>
@@ -1185,22 +1259,44 @@ function RecommendationsSection({ onNavigate }: { onNavigate?: (id:string)=>void
         <ScholarshipPanel dashboard={{ student, skillPassport, roleReadiness, gaps, simulator: { currentReadinessScore: roleReadiness.readinessScore, currentReadiness: roleReadiness.readiness, actions: simulatorActions }, recommendedProjects, opportunities, applications, recommendations, portfolio: portfolioData }} />
         <ModelDisclaimer />
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {recommendations.map((rec) => (
-            <div key={rec.id} className="rounded-xl border p-5" style={{ borderColor: "#E6E3D7", background: "#FAFAF7" }}>
-              <div className="font-mono text-[10px] font-bold tracking-widest uppercase mb-1" style={{ color: "#8A6FB8" }}>{rec.closesGap}</div>
-              <div className="font-semibold text-[16px] mb-1" style={{ color: "#171A18" }}>{rec.title}</div>
-              <div className="text-xs mb-2" style={{ color: "#6B6F68" }}>{rec.type} / {rec.provider} / {rec.duration}</div>
-              <div className="flex items-center gap-1 mb-2">
-                <Star size={13} style={{ color: "#E8D36B", fill: "#E8D36B" }} />
-                <span className="font-mono text-xs font-bold" style={{ color: "#6B6F68" }}>{rec.rating}</span>
+          {recommendations.map((rec) => {
+            const isCompleted = completed.has(rec.id);
+            return (
+              <div key={rec.id} className="rounded-xl border p-5 relative" style={{ borderColor: isCompleted ? "#DCE6D0" : "#E6E3D7", background: isCompleted ? "#F5FAF0" : "#FAFAF7" }}>
+                {isCompleted && (
+                  <div className="absolute top-3 right-3 flex items-center gap-1 px-2 py-0.5 rounded-md" style={{ background: "#DCE6D0" }}>
+                    <Check size={12} style={{ color: "#244B35" }} />
+                    <span className="font-mono text-[10px] font-bold" style={{ color: "#244B35" }}>DONE</span>
+                  </div>
+                )}
+                <div className="font-mono text-[10px] font-bold tracking-widest uppercase mb-1" style={{ color: "#8A6FB8" }}>{rec.closesGap}</div>
+                <div className="font-semibold text-[16px] mb-1" style={{ color: "#171A18" }}>{rec.title}</div>
+                <div className="text-xs mb-2" style={{ color: "#6B6F68" }}>{rec.type} / {rec.provider} / {rec.duration}</div>
+                <div className="flex items-center gap-1 mb-2">
+                  <Star size={13} style={{ color: "#E8D36B", fill: "#E8D36B" }} />
+                  <span className="font-mono text-xs font-bold" style={{ color: "#6B6F68" }}>{rec.rating}</span>
+                </div>
+                <p className="text-xs mb-3" style={{ color: "#6B6F68" }}>{rec.why}</p>
+                <div className="flex items-center justify-between">
+                  <span className="font-mono text-[10px] font-bold px-2 py-0.5 rounded-md" style={{ background: "#DCE6D0", color: "#244B35" }}>+{rec.projectedImprovement}% improvement</span>
+                  {isCompleted ? (
+                    <span className="font-mono text-xs font-bold text-[#244B35] inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#DCE6D0]">
+                      <Check size={12} /> Completed
+                    </span>
+                  ) : (
+                    <button
+                      onClick={() => handleComplete(rec.id)}
+                      disabled={completingId === rec.id}
+                      className="font-mono text-xs font-bold text-[#244B35] inline-flex items-center gap-1.5 hover:gap-3 transition-all px-3 py-1.5 rounded-lg hover:bg-[#F0F5EC] disabled:opacity-50"
+                    >
+                      {completingId === rec.id ? "Saving…" : "Mark completed"}
+                      {completingId !== rec.id && <Check size={12} />}
+                    </button>
+                  )}
+                </div>
               </div>
-              <p className="text-xs mb-3" style={{ color: "#6B6F68" }}>{rec.why}</p>
-              <div className="flex items-center justify-between">
-                <span className="font-mono text-[10px] font-bold px-2 py-0.5 rounded-md" style={{ background: "#DCE6D0", color: "#244B35" }}>+{rec.projectedImprovement}% improvement</span>
-                <button onClick={() => { const el=document.createElement("div"); el.className="fixed top-4 right-4 z-50 px-4 py-3 rounded-xl text-white font-semibold text-sm shadow-lg"; el.style.background="#244B35"; el.textContent="Added to your learning plan — check Learn tab!"; document.body.appendChild(el); setTimeout(()=>el.remove(),2500); onNavigate?.("recommendations"); }} className="font-mono text-xs font-bold text-[#244B35] inline-flex items-center gap-1.5 hover:gap-3 transition-all px-3 py-1.5 rounded-lg hover:bg-[#F0F5EC]">Start learning <ChevronRight size={12} /></button>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </motion.div>
     </div>
@@ -1495,7 +1591,7 @@ export default function StudentDashboard() {
             <div className="flex items-center gap-2">
               <div className="hidden sm:flex items-center gap-2 border rounded-xl px-3 py-2 bg-white flex-1 sm:flex-none max-w-[260px]" style={{ borderColor: "#E6E3D7" }}><Search size={14} style={{ color: "#9A9D94" }} /><input value={searchQuery} onChange={(e)=>{ setSearchQuery(e.target.value); if(e.target.value) setActiveNav("opportunities"); }} placeholder="Search skills, opportunities..." className="border-none outline-none bg-transparent text-[13px] w-full sm:w-48" style={{ color: "#171A18" }} />{searchQuery && <button onClick={()=>setSearchQuery("")} className="font-mono text-[10px] font-bold" style={{ color: "#9A9D94" }}>✕</button>}</div>
               <button type="button" onClick={() => setReportOpen(true)} aria-label="Print / Save as PDF" title="Print / Save as PDF" className="w-9 h-9 rounded-xl border bg-white flex items-center justify-center hover:bg-[#EFEDE3] transition-colors" style={{ borderColor: "#E6E3D7", color: "#6B6F68" }}><Printer size={16} /></button>
-              <button type="button" aria-label="Notifications" className="relative w-9 h-9 rounded-xl border bg-white flex items-center justify-center hover:bg-[#EFEDE3] transition-colors" style={{ borderColor: "#E6E3D7" }}><Bell size={16} /><span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full" style={{ background: "#C98B5F" }} /></button>
+              <div className="relative"><NotificationBell /></div>
             </div>
           </motion.div>
 

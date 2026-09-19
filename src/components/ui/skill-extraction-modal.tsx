@@ -23,6 +23,7 @@ import { studentApi } from "@/lib/student-api";
 import { notifyDataChanged } from "@/lib/data-events";
 import { celebrate } from "@/components/ui/confetti";
 import { useModalA11y } from "@/components/ui/use-modal-a11y";
+import SkillAssessmentModal from "@/components/ui/skill-assessment-modal";
 
 interface SkillExtractionModalProps {
   open: boolean;
@@ -60,6 +61,8 @@ export default function SkillExtractionModal({
     kept: number;
     verificationQueued: boolean;
   } | null>(null);
+  const [showAssessment, setShowAssessment] = useState(false);
+  const [assessmentPassed, setAssessmentPassed] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dropRef = useRef<HTMLDivElement>(null);
   const [dragging, setDragging] = useState(false);
@@ -72,6 +75,8 @@ export default function SkillExtractionModal({
     setError(null);
     setShowRaw(false);
     setSaveResult(null);
+    setShowAssessment(false);
+    setAssessmentPassed(false);
   }, []);
 
   const handleClose = useCallback(() => {
@@ -150,9 +155,18 @@ export default function SkillExtractionModal({
     setSelectedSkills(new Set());
   }, []);
 
-  const addSelectedSkills = useCallback(async () => {
+  /** Called when the user clicks "Add Skills" — opens the assessment first. */
+  const addSelectedSkills = useCallback(() => {
+    if (!result) return;
+    // Open the assessment modal; saving happens after the student passes.
+    setShowAssessment(true);
+  }, [result]);
+
+  /** Actually persist skills to the backend (called after assessment passes). */
+  const persistSkills = useCallback(async () => {
     if (!result) return;
     setStep("adding");
+    setShowAssessment(false);
     try {
       const skillsToAdd = Array.from(selectedSkills).map((i) => result.skills[i]);
       const payload = {
@@ -170,7 +184,6 @@ export default function SkillExtractionModal({
         const msg = err instanceof Error ? err.message : "";
         const isOffline = /cannot reach|failed to fetch|network|503|502|api running/i.test(msg);
         if (isOffline) {
-          // Backend/demo offline — persist locally so the demo still feels complete
           try {
             const key = "l2l.offline_extracted_skills";
             const prev = JSON.parse(localStorage.getItem(key) || "[]");
@@ -633,6 +646,18 @@ export default function SkillExtractionModal({
                 </button>
               </div>
             )}
+
+            {/* Skill Assessment Modal — opens when the student clicks Add Skills */}
+            <SkillAssessmentModal
+              open={showAssessment}
+              skills={result?.skills.filter((_, i) => selectedSkills.has(i)).map((s) => s.name) ?? []}
+              source={file?.name ?? "document"}
+              onClose={() => setShowAssessment(false)}
+              onPassed={() => {
+                setAssessmentPassed(true);
+                persistSkills();
+              }}
+            />
             {step === "review" && result && result.skills.length === 0 && showRaw && result.rawResponse && (
               <div className="px-5 pb-2">
                 <pre

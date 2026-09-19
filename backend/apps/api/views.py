@@ -20,7 +20,11 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.accounts.models import AcademicianProfile, IndustryProfile, InstitutionAdminProfile, StudentProfile, User
+from apps.accounts.models import (
+    AcademicianProfile, IndustryProfile, InstitutionAdminProfile,
+    SkillAssessment, StudentProfile, User,
+    LearningProgress, Notification, create_notification,
+)
 from apps.accounts.permissions import IsAcademician, IsIndustry, IsInstitutionAdmin, IsStudent
 from apps.catalog.models import Department, Institution, LearningResource, Skill, SkillCategory, TargetRole
 from apps.credentials.models import (
@@ -576,7 +580,316 @@ class StudentAddSkillView(APIView):
 
 
 # ---------------------------------------------------------------------------
+# SKILL ASSESSMENT
+# ---------------------------------------------------------------------------
+
+
+ASSESSMENT_SYSTEM_PROMPT = (
+    "You are an assessment generator for the Learn2Lead AYUSH academia-industry platform. "
+    "Generate a quick skill assessment quiz for a student who claims to have the listed skills. "
+    "Create exactly 2 multiple-choice questions per skill (4 options each, 1 correct). "
+    "Questions should test practical knowledge, not just definitions. "
+    "Return ONLY valid JSON: {\"questions\": [{\"skill\": \"Skill Name\", "
+    "\"question\": \"question text\", \"options\": [\"A\", \"B\", \"C\", \"D\"], "
+    "\"correctIndex\": 0, \"explanation\": \"brief explanation\"}]}"
+)
+
+
+def _generate_assessment_questions(skill_names: list[str], user_id=None) -> list[dict]:
+    """Generate MCQ questions via the AI gateway. Falls back to deterministic questions."""
+    names_str = ", ".join(skill_names[:6])
+    try:
+        data = ai_service.gateway_chat(
+            [
+                {"role": "system", "content": ASSESSMENT_SYSTEM_PROMPT},
+                {"role": "user", "content": f"Generate assessment questions for these skills: {names_str}"},
+            ],
+            temperature=0.3,
+            max_tokens=3000,
+            user_id=user_id,
+        )
+        content = data.get("choices", [{}])[0].get("message", {}).get("content") or ""
+        # Parse JSON from the response
+        import json as _json
+        json_match = content.match(r'```(?:json)?\s*([\s\S]*?)```')
+        if json_match:
+            content = json_match.group(1)
+        obj_match = content.match(r'\{[\s\S]*"questions"[\s\S]*\}')
+        if obj_match:
+            content = obj_match.group(0)
+        parsed = _json.loads(content)
+        questions = parsed.get("questions", [])
+        if isinstance(questions, list) and len(questions) > 0:
+            validated = []
+            for q in questions[:20]:
+                if not isinstance(q, dict):
+                    continue
+                opts = q.get("options") or []
+                if len(opts) < 2:
+                    continue
+                validated.append({
+                    "skill": str(q.get("skill") or "General").strip()[:80],
+                    "question": str(q.get("question") or "").strip()[:300],
+                    "options": [str(o).strip()[:120] for o in opts[:4]],
+                    "correctIndex": int(q.get("correctIndex") or 0) % len(opts),
+                    "explanation": str(q.get("explanation") or "").strip()[:200],
+                })
+            if validated:
+                return validated
+    except Exception:  # noqa: BLE001
+        pass
+
+    # Deterministic fallback: generic questions per skill
+    fallback = []
+    for skill in skill_names[:6]:
+        fallback.append({
+            "skill": skill,
+            "question": f"Which of the following best describes a key concept in {skill}?",
+            "options": [
+                f"Practical application and hands-on experience",
+                f"Only theoretical knowledge is required",
+                f"It is not relevant to AYUSH education",
+                f"It can only be learned in industry settings",
+            ],
+            "correctIndex": 0,
+            "explanation": f"{skill} involves practical application alongside theoretical foundations.",
+        })
+    return fallback
+
+
+class StudentAssessmentGenerateView(APIView):
+    """POST /api/student/assessment/generate — create a new skill assessment."""
+    permission_classes = (IsStudent,)
+
+    @transaction.atomic
+    def post(self, request):
+        data = request.data if isinstance(request.data, dict) else {}
+        skills = data.get("skills") or []
+        source = str(data.get("source") or "document").strip()[:200]
+        if not isinstance(skills, list) or not skills:
+            return Response({"detail": "skills must be a non-empty list of skill names."}, status=400)
+
+        skill_names = [str(s).strip()[:80] for s in skills if s][:10]
+        if not skill_names:
+            return Response({"detail": "No valid skill names provided."}, status=400)
+
+        questions = _generate_assessment_questions(skill_names, user_id=request.user.id)
+        if not questions:
+            return Response({"detail": "Could not generate assessment questions."}, status=500)
+
+        assessment = SkillAssessment.objects.create(
+            student=request.user,
+            source_document=source,
+            skills_assessed=skill_names,
+            questions=questions,
+            total_questions=len(questions),
+            time_limit_seconds=min(600, max(120, len(questions) * 30)),
+        )
+        return Response(
+            {
+                "id": assessment.id,
+                "questions": questions,
+                "totalQuestions": len(questions),
+                "timeLimitSeconds": assessment.time_limit_seconds,
+                "startedAt": assessment.started_at.isoformat(),
+            },
+            status=201,
+        )
+
+
+class StudentAssessmentSubmitView(APIView):
+    """POST /api/student/assessment/<pk>/submit — grade and record answers."""
+    permission_classes = (IsStudent,)
+
+    @transaction.atomic
+    def post(self, request, pk):
+        try:
+            assessment = SkillAssessment.objects.get(pk=pk, student=request.user)
+        except SkillAssessment.DoesNotExist:
+            return Response({"detail": "Assessment not found."}, status=404)
+
+        if assessment.status != "in_progress":
+            return Response({"detail": "This assessment has already been submitted."}, status=400)
+
+        data = request.data if isinstance(request.data, dict) else {}
+        answers = data.get("answers") or []
+        tab_switches = int(data.get("tabSwitches") or 0)
+
+        # Grade the assessment
+        questions = assessment.questions
+        score = 0
+        graded = []
+        for i, q in enumerate(questions):
+            user_answer = int(answers[i]) if i < len(answers) and isinstance(answers[i], (int, float)) else -1
+            correct = user_answer == q.get("correctIndex", 0)
+            if correct:
+                score += 1
+            graded.append({
+                "skill": q.get("skill", ""),
+                "question": q.get("question", ""),
+                "options": q.get("options", []),
+                "correctIndex": q.get("correctIndex", 0),
+                "userAnswer": user_answer,
+                "correct": correct,
+                "explanation": q.get("explanation", ""),
+            })
+
+        assessment.answers = graded
+        assessment.score = score
+        assessment.tab_switches = tab_switches
+        assessment.status = "submitted"
+        assessment.submitted_at = timezone.now()
+        assessment.save(
+            update_fields=["answers", "score", "tab_switches", "status", "submitted_at"]
+        )
+
+        percentage = round((score / max(len(questions), 1)) * 100)
+        passed = percentage >= 60
+        create_notification(
+            request.user,
+            Notification.NotificationType.ASSESSMENT,
+            f"Assessment {'passed' if passed else 'failed'}",
+            f"You scored {percentage}% on your skill assessment ({assessment.source_document}).",
+            link=f"/dashboard",
+        )
+        return Response(
+            {
+                "id": assessment.id,
+                "score": score,
+                "totalQuestions": len(questions),
+                "percentage": percentage,
+                "tabSwitches": tab_switches,
+                "gradedQuestions": graded,
+                "passed": passed,
+            },
+            status=200,
+        )
+
+
+# ---------------------------------------------------------------------------
 # INDUSTRY
+# ---------------------------------------------------------------------------
+# LEARNING PROGRESS (Skill Gap Closure Tracker)
+# ---------------------------------------------------------------------------
+
+
+class StudentRecommendationCompleteView(APIView):
+    """POST /api/student/recommendations/<pk>/complete — mark a learning
+    recommendation as completed, closing a skill gap."""
+    permission_classes = (IsStudent,)
+
+    @transaction.atomic
+    def post(self, request, pk):
+        try:
+            resource = LearningResource.objects.get(pk=pk)
+        except (LearningResource.DoesNotExist, ValueError):
+            return Response({"detail": "Recommendation not found."}, status=404)
+
+        progress, created = LearningProgress.objects.get_or_create(
+            student=request.user,
+            resource=resource,
+            defaults={"notes": request.data.get("notes", "")},
+        )
+        return Response(
+            {
+                "id": f"lp-{progress.id}",
+                "resourceId": f"rc-{resource.id}",
+                "title": resource.title,
+                "closesGap": resource.closes_gap.name if resource.closes_gap else resource.closes_gap_name,
+                "completedAt": progress.completed_at.isoformat(),
+                "created": created,
+            },
+            status=201 if created else 200,
+        )
+
+
+class StudentProgressView(APIView):
+    """GET /api/student/progress — summary of gap closure progress."""
+    permission_classes = (IsStudent,)
+
+    def get(self, request):
+        from apps.credentials.services import compute_gaps, student_target_role
+
+        role = student_target_role(request.user)
+        gaps = compute_gaps(request.user, role)
+        completed_ids = set(
+            LearningProgress.objects.filter(student=request.user).values_list("resource_id", flat=True)
+        )
+        completed_resources = LearningResource.objects.filter(pk__in=completed_ids)
+        closed_gap_names = set()
+        for r in completed_resources:
+            if r.closes_gap:
+                closed_gap_names.add(r.closes_gap.name)
+
+        total_gaps = len(gaps)
+        closed_count = sum(1 for g in gaps if g["name"] in closed_gap_names)
+        return Response({
+            "totalGaps": total_gaps,
+            "closedGaps": closed_count,
+            "completionRate": round((closed_count / max(total_gaps, 1)) * 100),
+            "completedResources": list(completed_ids),
+            "gaps": gaps,
+        })
+
+
+# ---------------------------------------------------------------------------
+# NOTIFICATIONS
+# ---------------------------------------------------------------------------
+
+
+class NotificationListView(APIView):
+    """GET /notifications — list recent notifications for the current user."""
+    permission_classes = (IsAuthenticated,)
+
+    def get(self, request):
+        limit = min(int(request.query_params.get("limit", 30)), 100)
+        unread_only = request.query_params.get("unread", "false") == "true"
+        qs = Notification.objects.filter(user=request.user)
+        if unread_only:
+            qs = qs.filter(read=False)
+        notifications = list(qs[:limit])
+        unread_count = Notification.objects.filter(user=request.user, read=False).count()
+        return Response({
+            "notifications": [
+                {
+                    "id": n.id,
+                    "type": n.notification_type,
+                    "title": n.title,
+                    "message": n.message,
+                    "link": n.link,
+                    "read": n.read,
+                    "createdAt": n.created_at.isoformat(),
+                }
+                for n in notifications
+            ],
+            "unreadCount": unread_count,
+        })
+
+
+class NotificationReadView(APIView):
+    """PATCH /notifications/<pk>/read — mark a single notification as read."""
+    permission_classes = (IsAuthenticated,)
+
+    def patch(self, request, pk):
+        try:
+            notification = Notification.objects.get(pk=pk, user=request.user)
+        except Notification.DoesNotExist:
+            return Response({"detail": "Not found."}, status=404)
+        notification.read = True
+        notification.save(update_fields=["read"])
+        return Response({"id": notification.id, "read": True})
+
+
+class NotificationReadAllView(APIView):
+    """POST /notifications/read-all — mark all unread notifications as read."""
+    permission_classes = (IsAuthenticated,)
+
+    def post(self, request):
+        count = Notification.objects.filter(user=request.user, read=False).update(read=True)
+        return Response({"marked": count})
+
+
+
 # ---------------------------------------------------------------------------
 
 
@@ -778,6 +1091,14 @@ class IndustryApplicationActionView(APIView):
             pass
         application.notes = request.data.get("notes", application.notes)
         application.save()
+        # Notify the student about the stage change
+        create_notification(
+            application.student,
+            Notification.NotificationType.APPLICATION_STAGE,
+            f"Application {action.title()}d",
+            f"Your application for {application.opportunity.title} has been {action}d.",
+            link=f"/dashboard?tab=applications",
+        )
         return Response({"id": application.id, "stage": application.stage})
 
 
@@ -930,6 +1251,14 @@ class AcademicianVerificationDecideView(APIView):
         verification.review_notes = request.data.get("notes", verification.review_notes)
         verification.save()
 
+        # Notify the student about the verification decision
+        create_notification(
+            verification.student,
+            Notification.NotificationType.VERIFICATION,
+            f"Evidence {action.title()}",
+            f'Your evidence "{verification.title}" has been {action}d by an academician.',
+            link=f"/dashboard",
+        )
         # Approving the verification also verifies the linked evidence, which
         # upgrades every evidence-backed skill claim into the verified passport.
         if action == "approved" and verification.evidence:
