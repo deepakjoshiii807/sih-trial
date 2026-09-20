@@ -529,7 +529,12 @@ function SkillPassportSection() {
               <div key={sk.id} className="p-3 rounded-xl border hover:shadow-sm transition-shadow" style={{ borderColor: "#E6DDD5", background: "linear-gradient(135deg, #FAFAF7, #FDF9F2)" }}>
                 <div className="flex items-center justify-between mb-1.5">
                   <span className="font-semibold text-sm" style={{ color: "#171A18" }}>{sk.name}</span>
-                  <span className="font-mono text-xs font-bold" style={{ color: "#6B6F68" }}>{sk.confidence}%</span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-xs font-bold" style={{ color: "#6B6F68" }}>{sk.confidence}%</span>
+                    <button onClick={() => { skillPassport.items = skillPassport.items.filter((s) => s.id !== sk.id); skillPassport.selfDeclaredCount = Math.max(0, skillPassport.selfDeclaredCount - 1); const el = document.createElement("div"); el.className = "fixed top-4 right-4 z-50 px-4 py-3 rounded-xl text-white font-semibold text-sm shadow-lg"; el.style.background = "#244B35"; el.textContent = `Removed ${sk.name}`; document.body.appendChild(el); setTimeout(() => el.remove(), 2000); }} className="p-1 rounded-lg hover:bg-red-50 transition-colors" title="Remove skill">
+                      <Trash2 size={13} style={{ color: "#C98B5F" }} />
+                    </button>
+                  </div>
                 </div>
                 <PxBar pct={sk.confidence} color="#E8D36B" />
                 <div className="mt-2 font-mono text-[10px]" style={{ color: "#9A9D94" }}>No evidence uploaded yet</div>

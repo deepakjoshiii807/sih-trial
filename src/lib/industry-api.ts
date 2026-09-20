@@ -181,19 +181,25 @@ export const industryApi = {
 
   /** POST /api/industry/opportunities */
   async createOpportunity(data: Omit<Opportunity, "id" | "totalApplicants" | "shortlistedCount" | "createdAt">): Promise<void> {
-    await apiClient.post("/industry/opportunities", data);
-    notifyAfterWrite();
+    try {
+      await apiClient.post("/industry/opportunities", data);
+      notifyAfterWrite();
+    } catch { /* offline */ }
   },
 
   /** PATCH /api/industry/opportunities/<pk> */
   async updateOpportunity(id: number, data: Partial<Opportunity>): Promise<void> {
-    await apiClient.patch(`/industry/opportunities/${id}`, data);
-    notifyAfterWrite();
+    try {
+      await apiClient.patch(`/industry/opportunities/${id}`, data);
+      notifyAfterWrite();
+    } catch { /* offline */ }
   },
 
   async _stage(id: number, action: string, body?: Record<string, unknown>): Promise<void> {
-    await apiClient.post(`/industry/applications/${id}/${action}`, body ?? {});
-    notifyAfterWrite();
+    try {
+      await apiClient.post(`/industry/applications/${id}/${action}`, body ?? {});
+      notifyAfterWrite();
+    } catch { /* offline */ }
   },
 
   /** POST /api/industry/applications/<pk>/shortlist */
@@ -218,13 +224,17 @@ export const industryApi = {
 
   /** PATCH /api/industry/profile — company settings tab */
   async updateSettings(data: Partial<Company>): Promise<void> {
-    await apiClient.patch("/industry/profile", data);
-    notifyAfterWrite();
+    try {
+      await apiClient.patch("/industry/profile", data);
+      notifyAfterWrite();
+    } catch { /* offline */ }
   },
 
   /** POST /api/industry/ratings */
   async submitRating(data: Omit<Rating, "id">): Promise<void> {
-    await apiClient.post("/industry/ratings", data);
-    notifyAfterWrite();
+    try {
+      await apiClient.post("/industry/ratings", data);
+      notifyAfterWrite();
+    } catch { /* offline */ }
   },
 };
