@@ -13,7 +13,7 @@ import {
 
 import type {
   Academician, DepartmentSkill, DemandTrend, IndustryRole,
-  CurriculumReport, VerificationRequest, AcademicanOpportunity,
+  CurriculumReport, VerificationRequest, ProjectSubmission, AcademicanOpportunity,
   CurriculumLoopStep, DepartmentAnalytics, AcademicianDashboard,
 } from "@/lib/faculty-api";
 import { facultyApi } from "@/lib/faculty-api";
@@ -79,6 +79,13 @@ let verifications: VerificationRequest[] = [
   { id: "v-6", studentName: "Vikram Singh", studentInitials: "VS", title: "Pharmacognosy Lab Report", type: "Project", submittedDate: "Aug 25, 2025", status: "pending", skillsClaimed: ["Pharmacognosy", "Documentation"], description: "Lab report on medicinal plant identification." },
 ];
 
+let projects: ProjectSubmission[] = [
+  { id: "ps-1", studentName: "Aarav Sharma", studentInitials: "AS", projectTitle: "Clinical Data Statistical Analysis", targetSkill: "Statistical Analysis", description: "Analyze a clinical trial dataset with statistical tests and visualizations.", submittedDate: "2025-09-12", status: "pending review" },
+  { id: "ps-2", studentName: "Neha Gupta", studentInitials: "NG", projectTitle: "Herbal Drug Efficacy Literature Review", targetSkill: "Scientific Writing", description: "Systematic literature review on Ayurvedic formulation efficacy.", submittedDate: "2025-09-10", status: "pending review" },
+  { id: "ps-3", studentName: "Ravi Kumar", studentInitials: "RK", projectTitle: "ML Prediction Model", targetSkill: "Machine Learning", description: "Classification model for treatment outcome prediction.", submittedDate: "2025-09-08", status: "verified", reviewComment: "Excellent — 87% accuracy, well-documented." },
+  { id: "ps-4", studentName: "Priya Desai", studentInitials: "PD", projectTitle: "Pharmacovigilance Database", targetSkill: "Data Management", description: "Relational database for adverse drug reaction tracking.", submittedDate: "2025-09-14", status: "pending review" },
+  { id: "ps-5", studentName: "Amit Verma", studentInitials: "AV", projectTitle: "Clinical Trial Protocol", targetSkill: "Clinical Research", description: "Complete RCT protocol for Ayurvedic vs conventional treatment.", submittedDate: "2025-09-06", status: "needs revision", reviewComment: "Needs stronger methodology section." },
+];
 let opportunities: AcademicanOpportunity[] = [
   { id: "ao-1", title: "FDP on AI in Healthcare", category: "FDP", organizer: "AICTE", location: "Online", duration: "2 weeks", deadline: "Oct 15, 2025", description: "Learn to integrate AI/ML into healthcare curriculum.", skillsRelevant: ["Machine Learning", "Data Analysis", "Python"], status: "open", interested: 8 },
   { id: "ao-2", title: "Industrial Training at CCRAS", category: "Industrial Training", organizer: "CCRAS", location: "New Delhi", duration: "1 month", deadline: "Sept 30, 2025", description: "Hands-on research training at CCRAS.", skillsRelevant: ["Research Methodology", "Clinical Research"], status: "open", interested: 5 },
@@ -105,6 +112,7 @@ export function hydrateFacultyDashboard(payload: AcademicianDashboard) {
   industryRoles = payload.industryRoles;
   curriculumReport = payload.curriculumReport;
   verifications = payload.verifications;
+  projects = payload.projects ?? [];
   opportunities = payload.opportunities;
   curriculumLoop = payload.curriculumLoop;
   analytics = payload.analytics;
@@ -116,6 +124,7 @@ const navLinks = [
   { id: "demand", label: "Industry Demand", icon: <TrendingUp size={18} /> },
   { id: "curriculum", label: "Curriculum Feedback", icon: <FileText size={18} /> },
   { id: "verification", label: "Student Verification", icon: <ClipboardCheck size={18} />, count: 4 },
+  { id: "projects", label: "Project Review", icon: <FileText size={18} /> },
   { id: "opportunities", label: "Opportunities", icon: <Briefcase size={18} /> },
   { id: "curriculum-loop", label: "Curriculum Loop", icon: <FlaskConical size={18} /> },
   { id: "analytics", label: "Analytics", icon: <BarChart3 size={18} /> },
@@ -442,6 +451,7 @@ function CurriculumSection() {
    STUDENT VERIFICATION
    ═══════════════════════════════════════════════════════ */
 function VerificationSection() {
+  const [notesMap, setNotesMap] = useState<Record<string, string>>({});
   const pending = verifications.filter(v => v.status === "pending");
   const flagged = verifications.filter(v => v.status === "flagged");
   const approved = verifications.filter(v => v.status === "approved");
@@ -482,10 +492,12 @@ function VerificationSection() {
               <div className="flex flex-wrap gap-1 mb-3">{v.skillsClaimed.map(s => <Tag key={s} cls="Acceptable">{s}</Tag>)}</div>
               <div className="flex items-center justify-between pt-3 border-t" style={{ borderColor: "#EDEBE0" }}>
                 <div className="flex items-center gap-2"><Tag cls={v.type === "Project" ? "Research Collaboration" : v.type === "Certificate" ? "FDP" : "Industrial Training"}>{v.type}</Tag><span className="font-mono text-[11px]" style={{ color: "#9A9D94" }}>{v.submittedDate}</span></div>
-                {v.status === "pending" && <div className="flex gap-2">
-                  <button onClick={async () => { try { await facultyApi.verifyStudent(v.id, "approved"); (v as any).status = "approved"; const el=document.createElement("div"); el.className="fixed top-4 right-4 z-50 px-4 py-3 rounded-xl text-white font-semibold text-sm shadow-lg"; el.style.background="#244B35"; el.textContent="Verified — student notified."; document.body.appendChild(el); setTimeout(()=>el.remove(),2500); } catch(err) { const m=err instanceof Error?err.message:String(err); const isOffline=/Cannot reach|backend unreachable|Network|Failed to fetch|Load failed/i.test(m); { const el=document.createElement("div"); el.className="fixed top-4 right-4 z-50 px-4 py-3 rounded-xl text-white font-semibold text-sm shadow-lg"; el.style.background="#7a3f1a"; el.textContent=m; document.body.appendChild(el); setTimeout(()=>el.remove(),2800);} } }} className="font-semibold text-[11px] px-3 py-1.5 rounded-lg transition-all hover:shadow-sm" style={{ background: "#DCE6D0", color: "#16301F" }}>Verify</button>
-                  <button onClick={async () => { try { await facultyApi.verifyStudent(v.id, "changes-requested"); (v as any).status = "changes-requested"; const el=document.createElement("div"); el.className="fixed top-4 right-4 z-50 px-4 py-3 rounded-xl text-white font-semibold text-sm shadow-lg"; el.style.background="#244B35"; el.textContent="Changes requested."; document.body.appendChild(el); setTimeout(()=>el.remove(),2500); } catch(err) { const m=err instanceof Error?err.message:String(err); const isOffline=/Cannot reach|backend unreachable|Network|Failed to fetch|Load failed/i.test(m); { const el=document.createElement("div"); el.className="fixed top-4 right-4 z-50 px-4 py-3 rounded-xl text-white font-semibold text-sm shadow-lg"; el.style.background="#7a3f1a"; el.textContent=m; document.body.appendChild(el); setTimeout(()=>el.remove(),2800);} } }} className="font-semibold text-[11px] px-3 py-1.5 rounded-lg border transition-all hover:bg-[#FAFAF7]" style={{ borderColor: "#E6E3D7" }}>Request Changes</button>
-                </div>}
+                {v.status === "pending" && <>
+                  <div className="mb-2"><textarea value={notesMap[v.id] || ""} onChange={(e) => setNotesMap((prev) => ({ ...prev, [v.id]: e.target.value }))} placeholder="Add feedback notes (optional)..." rows={2} className="w-full rounded-lg border px-3 py-2 text-xs resize-none" style={{ borderColor: "#E6E3D7" }} /></div>
+                  <div className="flex gap-2">
+                  <button onClick={async () => { try { await facultyApi.verifyStudent(v.id, "approved", notesMap[v.id] || ""); (v as any).status = "approved"; const el=document.createElement("div"); el.className="fixed top-4 right-4 z-50 px-4 py-3 rounded-xl text-white font-semibold text-sm shadow-lg"; el.style.background="#244B35"; el.textContent="Verified — student notified."; document.body.appendChild(el); setTimeout(()=>el.remove(),2500); } catch(err) { const m=err instanceof Error?err.message:String(err); const isOffline=/Cannot reach|backend unreachable|Network|Failed to fetch|Load failed/i.test(m); { const el=document.createElement("div"); el.className="fixed top-4 right-4 z-50 px-4 py-3 rounded-xl text-white font-semibold text-sm shadow-lg"; el.style.background="#7a3f1a"; el.textContent=m; document.body.appendChild(el); setTimeout(()=>el.remove(),2800);} } }} className="font-semibold text-[11px] px-3 py-1.5 rounded-lg transition-all hover:shadow-sm" style={{ background: "#DCE6D0", color: "#16301F" }}>Verify</button>
+                  <button onClick={async () => { try { await facultyApi.verifyStudent(v.id, "changes-requested", notesMap[v.id] || ""); (v as any).status = "changes-requested"; const el=document.createElement("div"); el.className="fixed top-4 right-4 z-50 px-4 py-3 rounded-xl text-white font-semibold text-sm shadow-lg"; el.style.background="#244B35"; el.textContent="Changes requested."; document.body.appendChild(el); setTimeout(()=>el.remove(),2500); } catch(err) { const m=err instanceof Error?err.message:String(err); const isOffline=/Cannot reach|backend unreachable|Network|Failed to fetch|Load failed/i.test(m); { const el=document.createElement("div"); el.className="fixed top-4 right-4 z-50 px-4 py-3 rounded-xl text-white font-semibold text-sm shadow-lg"; el.style.background="#7a3f1a"; el.textContent=m; document.body.appendChild(el); setTimeout(()=>el.remove(),2800);} } }} className="font-semibold text-[11px] px-3 py-1.5 rounded-lg border transition-all hover:bg-[#FAFAF7]" style={{ borderColor: "#E6E3D7" }}>Request Changes</button>
+                </div></>}
               </div>
             </div>
           ))}

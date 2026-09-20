@@ -121,6 +121,7 @@ export interface AcademicianDashboard {
   industryRoles: IndustryRole[];
   curriculumReport: CurriculumReport;
   verifications: VerificationRequest[];
+  projects: ProjectSubmission[];
   opportunities: AcademicanOpportunity[];
   curriculumLoop: CurriculumLoopStep[];
   analytics: DepartmentAnalytics;
@@ -130,6 +131,18 @@ export interface AcademicianDashboard {
 function numId(value: string | number): number {
   if (typeof value === "number") return value;
   return parseInt(value.replace(/^[a-z]+-/, ""), 10) || 0;
+}
+
+export interface ProjectSubmission {
+  id: string;
+  studentName: string;
+  studentInitials: string;
+  projectTitle: string;
+  targetSkill: string;
+  description: string;
+  submittedDate: string;
+  status: "pending review" | "verified" | "needs revision";
+  reviewComment?: string;
 }
 
 export const facultyApi = {
@@ -143,13 +156,43 @@ export const facultyApi = {
     }
   },
 
-  /** POST /api/academician/verifications/<pk>/decide {action} */
-  async verifyStudent(id: string, action: "approved" | "flagged" | "changes-requested"): Promise<void> {
+  /** POST /api/academician/verifications/<pk>/decide {action, notes?} */
+  async verifyStudent(id: string, action: "approved" | "flagged" | "changes-requested", notes?: string): Promise<void> {
     try {
-      await apiClient.post(`/academician/verifications/${numId(id)}/decide`, { action });
+      await apiClient.post(`/academician/verifications/${numId(id)}/decide`, { action, notes });
       notifyAfterWrite();
     } catch {
       // Offline — silently succeed (the UI already updates optimistically)
+    }
+  },
+
+  /** POST /api/academician/projects/<pk>/decide {action, notes?} */
+  async decideProject(id: string, action: "verified" | "needs revision", notes?: string): Promise<void> {
+    try {
+      await apiClient.post(`/academician/projects/${numId(id)}/decide`, { action, notes });
+      notifyAfterWrite();
+    } catch {
+      // Offline — silently succeed
+    }
+  },
+
+  /** POST /api/academician/opportunities — create a new opportunity */
+  async createOpportunity(data: {
+    title: string;
+    category: OpportunityCategory;
+    organizer: string;
+    location: string;
+    duration: string;
+    deadline: string;
+    description: string;
+    skillsRelevant: string[];
+  }): Promise<{ id: string; created: boolean }> {
+    try {
+      const { data: result } = await apiClient.post("/academician/opportunities", data);
+      return result;
+    } catch {
+      // Offline — return a mock ID
+      return { id: `ao-${Date.now()}`, created: true };
     }
   },
 
@@ -238,6 +281,13 @@ const DEMO_DASHBOARD: AcademicianDashboard = {
     { id: "v-3", studentName: "Ravi Kumar", studentInitials: "RK", title: "Clinical Data Analysis Project", type: "Project", submittedDate: "2025-09-05", status: "approved", skillsClaimed: ["Statistical Analysis", "Python", "Data Analysis"], description: "Analysis of 500+ patient records using Python and statistical methods." },
     { id: "v-4", studentName: "Priya Desai", studentInitials: "PD", title: "Pharmacovigilance Report", type: "Skill Evidence", submittedDate: "2025-09-12", status: "pending", skillsClaimed: ["Pharmacovigilance", "Scientific Writing"], description: "Comprehensive pharmacovigilance report on Ayurvedic formulations." },
     { id: "v-5", studentName: "Amit Verma", studentInitials: "AV", title: "ML Research Paper Submission", type: "Project", submittedDate: "2025-09-11", status: "changes-requested", skillsClaimed: ["Machine Learning", "Python"], description: "Research paper on applying ML to predict Ayurvedic treatment outcomes." },
+  ],
+  projects: [
+    { id: "ps-1", studentName: "Aarav Sharma", studentInitials: "AS", projectTitle: "Clinical Data Statistical Analysis", targetSkill: "Statistical Analysis", description: "Analyze a provided clinical trial dataset. Apply appropriate statistical tests, create visualizations, and write a brief findings report.", submittedDate: "2025-09-12", status: "pending review" },
+    { id: "ps-2", studentName: "Neha Gupta", studentInitials: "NG", projectTitle: "Herbal Drug Efficacy Literature Review", targetSkill: "Scientific Writing", description: "Conduct a systematic literature review on the efficacy of a chosen Ayurvedic formulation. Follow scientific writing standards.", submittedDate: "2025-09-10", status: "pending review" },
+    { id: "ps-3", studentName: "Ravi Kumar", studentInitials: "RK", projectTitle: "ML Prediction Model for Treatment Outcomes", targetSkill: "Machine Learning", description: "Build a classification model to predict treatment outcomes based on patient features. Use Python, scikit-learn, and proper evaluation metrics.", submittedDate: "2025-09-08", status: "verified", reviewComment: "Excellent work — model accuracy 87%, well-documented code." },
+    { id: "ps-4", studentName: "Priya Desai", studentInitials: "PD", projectTitle: "Pharmacovigilance Database Design", targetSkill: "Data Management", description: "Design and implement a relational database for tracking adverse drug reactions in Ayurvedic medicines.", submittedDate: "2025-09-14", status: "pending review" },
+    { id: "ps-5", studentName: "Amit Verma", studentInitials: "AV", projectTitle: "Research Protocol for Clinical Trial", targetSkill: "Clinical Research", description: "Write a complete research protocol for a randomized controlled trial comparing Ayurvedic and conventional treatments.", submittedDate: "2025-09-06", status: "needs revision", reviewComment: "Needs stronger methodology section and larger sample size justification." },
   ],
   opportunities: [
     { id: "ao-1", title: "Faculty Development Programme on AI in Healthcare", category: "FDP", organizer: "AICTE", location: "Online", duration: "2 weeks", deadline: "Oct 15, 2025", description: "Learn to integrate AI/ML concepts into healthcare curriculum.", skillsRelevant: ["Machine Learning", "Data Analysis", "Python"], status: "open", interested: 8 },
