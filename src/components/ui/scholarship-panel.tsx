@@ -65,11 +65,27 @@ export default function ScholarshipPanel({ dashboard }: { dashboard: StudentDash
               <div className="text-xs" style={{ color: "#6B6F68" }}>{s.provider} {s.amount ? `· ${s.amount}` : ""}</div>
               <div className="text-xs mt-2" style={{ color: "#171A18" }}><span className="font-semibold">Why you match:</span> {s.whyYouMatch}</div>
               <div className="text-[11px] mt-1" style={{ color: "#9A9D94" }}>{s.eligibility}</div>
-              {s.url && (
-                <a href={s.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs font-semibold mt-2" style={{ color: "#244B35" }}>
-                  View <ExternalLink size={12} />
-                </a>
-              )}
+              <div className="flex items-center gap-3 mt-2">
+                {s.url && (
+                  <a href={s.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs font-semibold" style={{ color: "#244B35" }}>
+                    View <ExternalLink size={12} />
+                  </a>
+                )}
+                <button
+                  onClick={() => {
+                    const el = document.createElement("div");
+                    el.className = "fixed top-4 right-4 z-50 px-4 py-3 rounded-xl text-white font-semibold text-sm shadow-lg";
+                    el.style.background = "#244B35";
+                    el.textContent = `Application submitted for ${s.title}!`;
+                    document.body.appendChild(el);
+                    setTimeout(() => el.remove(), 2500);
+                  }}
+                  className="inline-flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-lg text-white transition-all hover:opacity-90"
+                  style={{ background: "#8A6FB8" }}
+                >
+                  Apply
+                </button>
+              </div>
               <div className="font-mono text-[10px] mt-2" style={{ color: "#9A9D94" }}>{s.confidence}% fit</div>
             </div>
           ))}

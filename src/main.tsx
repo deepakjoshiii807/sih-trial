@@ -1,6 +1,7 @@
 import '@vly-ai/integrations';
 import { Toaster } from "@/components/ui/sonner";
 import { AuthProvider } from "@/lib/auth";
+import KeyboardShortcuts from "@/components/ui/keyboard-shortcuts";
 import { registerServiceWorker } from "@/lib/pwa";
 import { VlyToolbar } from '../vly-toolbar-readonly.tsx';
 import { Component, StrictMode, type ReactNode } from "react";
@@ -103,6 +104,7 @@ createRoot(document.getElementById("root")!).render(
         </Routes>
       </BrowserRouter>
       <ToolbarErrorBoundary>
+        <KeyboardShortcuts />
         <VlyToolbar />
       </ToolbarErrorBoundary>
       <Toaster />
