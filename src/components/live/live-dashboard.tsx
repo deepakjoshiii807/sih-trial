@@ -73,6 +73,10 @@ export function LiveDashboard<T>({ load, hydrate, label, children }: LiveDashboa
       <DashboardError
         message={`${phase.message} (${apiHint})`}
         onRetry={retry}
+        secondaryLabel="Continue with demo data"
+        onSecondary={() => {
+          setPhase({ status: "ready" });
+        }}
       />
     );
   }
