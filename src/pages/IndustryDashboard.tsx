@@ -20,6 +20,8 @@ import type {
 import { industryApi } from "@/lib/industry-api";
 import IndustryAIRank from "@/components/ui/industry-ai-rank";
 import PrintButton from "@/components/ui/print-button";
+import { SmartMatchScore } from "@/components/ui/smart-match-score";
+import { MessagingSystem } from "@/components/ui/messaging-system";
 
 /** Module-scope data holders — populated by LiveDashboard via hydrateIndustryDashboard().
  *  All start empty; the dashboard skeleton renders during the fetch, so users
@@ -54,6 +56,8 @@ const navLinks = [
   { id: "analytics", label: "Analytics", icon: <BarChart3 size={18} /> },
   { id: "sla", label: "SLA Tracker", icon: <Clock size={18} /> },
   { id: "ratings", label: "Ratings", icon: <Star size={18} /> },
+  { id: "match-score", label: "Smart Match", icon: <Target size={18} /> },
+  { id: "messaging", label: "Messages", icon: <Mail size={18} /> },
   { id: "completion", label: "Completion", icon: <Check size={18} /> },
 ];
 
@@ -823,6 +827,8 @@ export default function IndustryDashboard() {
       case "analytics": return <AnalyticsSection />;
       case "sla": return <SLASection />;
       case "ratings": return <RatingsSection />;
+      case "match-score": return <SmartMatchScore />;
+      case "messaging": return <MessagingSystem />;
       case "completion": return <CompletionSection />;
       case "settings": return <SettingsSection />;
       default: return <OverviewSection />;

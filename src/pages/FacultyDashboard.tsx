@@ -20,6 +20,7 @@ import { facultyApi } from "@/lib/faculty-api";
 import FacultyAIQueue from "@/components/ui/faculty-ai-queue";
 import PrintButton from "@/components/ui/print-button";
 import DemandTimeline from "@/components/ui/charts/demand-timeline";
+import { StudentProgressTracker } from "@/components/ui/student-progress-tracker";
 
 /* ─── Mock Data ─── */
 let academician: Academician = { name: "Dr. Priya Mehta", initials: "PM", title: "Professor of Ayurveda & Research", department: "Department of Ayurveda", institution: "All India Institute of Ayurveda", email: "priya.mehta@aiia.ac.in", phone: "+91 98765 12345", bio: "Professor with 12 years of experience in clinical research, AYUSH studies, and curriculum development.", subjects: ["Clinical Research", "Pharmacology", "Research Methodology", "AYUSH Therapeutics"], researchInterests: ["Herbal Pharmacovigilance", "Clinical Trial Design", "AYUSH Healthcare Delivery"], experience: 12, studentsCount: 24, verifiedCount: 18 };
@@ -128,6 +129,7 @@ const navLinks = [
   { id: "opportunities", label: "Opportunities", icon: <Briefcase size={18} /> },
   { id: "curriculum-loop", label: "Curriculum Loop", icon: <FlaskConical size={18} /> },
   { id: "analytics", label: "Analytics", icon: <BarChart3 size={18} /> },
+  { id: "progress", label: "Student Progress", icon: <TrendingUp size={18} /> },
   { id: "profile", label: "My Profile", icon: <UserCog size={18} /> },
 ];
 
@@ -807,6 +809,7 @@ export default function FacultyDashboard() {
       case "opportunities": return <OpportunitiesSection />;
       case "curriculum-loop": return <CurriculumLoopSection />;
       case "analytics": return <AnalyticsSection />;
+      case "progress": return <StudentProgressTracker />;
       case "profile": return <ProfileSection />;
       case "settings": return <SettingsSection />;
       default: return <OverviewSection />;
