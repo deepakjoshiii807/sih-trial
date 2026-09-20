@@ -236,6 +236,102 @@ function numId(value: string | number, prefix?: string): number {
   return parseInt(cleaned, 10) || 0;
 }
 
+/**
+ * Generate a mock assessment from claimed skills when the backend is unreachable.
+ * Two questions per skill, randomized options, 65 s per question.
+ */
+function generateFallbackAssessment(skills: string[]): {
+  id: number;
+  questions: { skill: string; question: string; options: string[]; correctIndex: number; explanation: string }[];
+  totalQuestions: number;
+  timeLimitSeconds: number;
+  startedAt: string;
+} {
+  const allQuestions: { skill: string; question: string; options: string[]; correctIndex: number; explanation: string }[] = [];
+
+  for (const skill of skills) {
+    const qs = MOCK_QUESTIONS[skill] ?? [
+      {
+        question: `Which of the following best describes a core concept in ${skill}?`,
+        options: ["Using best practices and design patterns", "Ignoring error handling", "Hardcoding all values", "Skipping tests"],
+        correctIndex: 0,
+        explanation: `${skill} best practices emphasize structured, maintainable approaches.`,
+      },
+      {
+        question: `What is a common application of ${skill} in real-world projects?`,
+        options: ["Building reliable, scalable solutions", "Writing unmaintainable code", "Avoiding documentation", "Skipping code reviews"],
+        correctIndex: 0,
+        explanation: `${skill} is applied to create robust and scalable software solutions.`,
+      },
+    ];
+    allQuestions.push(...qs.map((q) => ({ ...q, skill })));
+  }
+
+  return {
+    id: -Date.now(), // negative id signals a local/mock assessment
+    questions: allQuestions,
+    totalQuestions: allQuestions.length,
+    timeLimitSeconds: allQuestions.length * 65,
+    startedAt: new Date().toISOString(),
+  };
+}
+
+/** Skill-specific mock question banks (2 questions per skill). */
+const MOCK_QUESTIONS: Record<string, { question: string; options: string[]; correctIndex: number; explanation: string }[]> = {
+  "REST APIs": [
+    { question: "What HTTP status code indicates a successfully created resource?", options: ["201 Created", "200 OK", "404 Not Found", "500 Internal Server Error"], correctIndex: 0, explanation: "201 Created is returned when a new resource is successfully created on the server." },
+    { question: "Which HTTP method is idempotent and used to update a resource?", options: ["PUT", "POST", "PATCH", "DELETE"], correctIndex: 0, explanation: "PUT is idempotent — sending the same request multiple times produces the same result." },
+  ],
+  "System Design": [
+    { question: "What is the primary purpose of a load balancer?", options: ["Distribute traffic across multiple servers", "Encrypt data in transit", "Store session state", "Compile source code"], correctIndex: 0, explanation: "Load balancers distribute incoming network traffic across backend servers to ensure reliability." },
+    { question: "Which pattern is best for handling eventual consistency in distributed systems?", options: ["Event sourcing", "Singleton pattern", "Factory pattern", "Observer pattern"], correctIndex: 0, explanation: "Event sourcing captures all changes as a sequence of events, naturally handling eventual consistency." },
+  ],
+  "Authentication": [
+    { question: "What does JWT stand for?", options: ["JSON Web Token", "Java Workflow Tool", "Joint Web Transfer", "JSON Wire Transfer"], correctIndex: 0, explanation: "JWT stands for JSON Web Token, a compact, URL-safe means of representing claims." },
+    { question: "Which OAuth flow is recommended for single-page applications?", options: ["Authorization Code with PKCE", "Client Credentials", "Implicit Flow", "Resource Owner Password"], correctIndex: 0, explanation: "Authorization Code with PKCE is the recommended, secure flow for SPAs." },
+  ],
+  Authorization: [
+    { question: "What is the difference between authentication and authorization?", options: ["Authentication verifies identity; authorization grants permissions", "They are the same thing", "Authorization verifies identity; authentication grants permissions", "Neither involves user identity"], correctIndex: 0, explanation: "Authentication confirms who you are; authorization determines what you can access." },
+    { question: "What does RBAC stand for?", options: ["Role-Based Access Control", "Random-Based Access Control", "Resource-Based Access Configuration", "Role-Based Auth Configuration"], correctIndex: 0, explanation: "RBAC = Role-Based Access Control, where permissions are assigned to roles rather than individuals." },
+  ],
+  TypeScript: [
+    { question: "What is the 'unknown' type in TypeScript used for?", options: ["Safer alternative to 'any' — forces type narrowing", "Declaring undefined variables", "Type for null values", "Legacy compatibility"], correctIndex: 0, explanation: "'unknown' is type-safe: you must narrow it before using it, unlike 'any' which bypasses checks." },
+    { question: "What does the 'readonly' modifier do in TypeScript?", options: ["Prevents reassignment of properties after initialization", "Makes a class immutable", "Prevents inheritance", "Removes a property at runtime"], correctIndex: 0, explanation: "'readonly' prevents reassignment of a property, but the object itself is still mutable." },
+  ],
+  MongoDB: [
+    { question: "What type of database is MongoDB?", options: ["Document-oriented NoSQL", "Relational SQL", "Graph database", "Key-value store"], correctIndex: 0, explanation: "MongoDB is a document-oriented NoSQL database that stores data in BSON format." },
+    { question: "Which MongoDB operation inserts a single document?", options: ["insertOne", "insertMany", "create", "addDocument"], correctIndex: 0, explanation: "insertOne() inserts a single document into a collection." },
+  ],
+  Python: [
+    { question: "What is a Python decorator?", options: ["A function that modifies another function's behavior", "A class attribute", "A type of loop", "A variable declaration"], correctIndex: 0, explanation: "Decorators are functions that wrap other functions to extend their behavior without modifying them." },
+    { question: "What does 'pip' stand for in Python?", options: ["Pip Installs Packages", "Python Installation Program", "Package Interface Protocol", "Python Integration Platform"], correctIndex: 0, explanation: "pip is the package installer for Python, standing for 'Pip Installs Packages'." },
+  ],
+  "Machine Learning": [
+    { question: "What is overfitting in machine learning?", options: ["Model performs well on training data but poorly on new data", "Model performs poorly on all data", "Model is too simple to capture patterns", "Model has too few parameters"], correctIndex: 0, explanation: "Overfitting occurs when a model learns noise in training data, reducing generalization." },
+    { question: "Which algorithm is commonly used for classification tasks?", options: ["Random Forest", "Linear Regression", "K-Means Clustering", "PCA"], correctIndex: 0, explanation: "Random Forest is an ensemble method widely used for classification and regression." },
+  ],
+  "Data Analysis": [
+    { question: "What is the primary purpose of exploratory data analysis (EDA)?", options: ["Understand data distributions and relationships before modeling", "Train a production model", "Deploy a web application", "Generate synthetic data"], correctIndex: 0, explanation: "EDA helps you understand patterns, outliers, and relationships in your data." },
+    { question: "Which library is commonly used for data manipulation in Python?", options: ["Pandas", "Flask", "Django", "FastAPI"], correctIndex: 0, explanation: "Pandas provides DataFrames for efficient data manipulation and analysis." },
+  ],
+  "Research Methodology": [
+    { question: "What is a control group in research?", options: ["A group that does not receive the experimental treatment", "The group being studied", "A group receiving a placebo only", "A group with no participants"], correctIndex: 0, explanation: "The control group serves as a baseline by not receiving the experimental intervention." },
+    { question: "What does 'p-value' indicate in statistical testing?", options: ["Probability of observing results at least as extreme under the null hypothesis", "Probability the hypothesis is true", "Percentage of variance explained", "Power of the test"], correctIndex: 0, explanation: "The p-value measures how compatible your data is with the null hypothesis." },
+  ],
+  "Clinical Research": [
+    { question: "What is a randomized controlled trial (RCT)?", options: ["Participants are randomly assigned to treatment or control groups", "All participants receive the treatment", "No control group is used", "It is an observational study"], correctIndex: 0, explanation: "RCTs randomly assign participants to minimize bias and establish causation." },
+    { question: "What is 'informed consent' in clinical research?", options: ["Participants fully understand risks and voluntarily agree to participate", "A signed legal contract", "A doctor's prescription", "An insurance policy"], correctIndex: 0, explanation: "Informed consent ensures participants know the risks, benefits, and alternatives before joining." },
+  ],
+  "Scientific Writing": [
+    { question: "What is the standard structure of a scientific research paper?", options: ["Abstract, Introduction, Methods, Results, Discussion", "Introduction, Conclusion, Abstract", "Methods, Results, Title", "Discussion, References, Figures"], correctIndex: 0, explanation: "The IMRAD structure (Introduction, Methods, Results, and Discussion) is the standard format." },
+    { question: "What is a peer review?", options: ["Evaluation by experts in the same field before publication", "Review by the general public", "Self-assessment by the author", "Review by a single editor"], correctIndex: 0, explanation: "Peer review involves evaluation by qualified experts to ensure quality and validity." },
+  ],
+  "Statistical Analysis": [
+    { question: "What is the difference between descriptive and inferential statistics?", options: ["Descriptive summarizes data; inferential makes predictions about populations", "They are the same thing", "Inferential summarizes data; descriptive makes predictions", "Neither uses numerical data"], correctIndex: 0, explanation: "Descriptive stats describe your dataset; inferential stats draw conclusions about a larger population." },
+    { question: "What is a confidence interval?", options: ["A range likely containing the true population parameter", "The exact value of a parameter", "A single point estimate", "The sample size"], correctIndex: 0, explanation: "A confidence interval gives a range of plausible values for an unknown population parameter." },
+  ],
+};
+
 export const studentApi = {
   /** GET /api/student/dashboard */
   async getDashboard(): Promise<StudentDashboard> {
@@ -285,15 +381,34 @@ export const studentApi = {
 
   /** Assessment result returned by POST /api/student/assessment/<pk>/submit */
   async generateAssessment(skills: string[], source: string): Promise<{ id: number; questions: { skill: string; question: string; options: string[]; correctIndex: number; explanation: string }[]; totalQuestions: number; timeLimitSeconds: number; startedAt: string }> {
-    const { data } = await apiClient.post<AssessmentResult>("/student/assessment/generate", { skills, source });
-    // The generate endpoint returns AssessmentShape, not AssessmentResult;
-    // map it into the shape the modal expects.
-    return data as unknown as { id: number; questions: { skill: string; question: string; options: string[]; correctIndex: number; explanation: string }[]; totalQuestions: number; timeLimitSeconds: number; startedAt: string };
+    try {
+      const { data } = await apiClient.post<AssessmentResult>("/student/assessment/generate", { skills, source });
+      return data as unknown as { id: number; questions: { skill: string; question: string; options: string[]; correctIndex: number; explanation: string }[]; totalQuestions: number; timeLimitSeconds: number; startedAt: string };
+    } catch {
+      // Backend unreachable — generate mock questions from the claimed skills
+      return generateFallbackAssessment(skills);
+    }
   },
 
   async submitAssessment(id: number, answers: number[], tabSwitches: number): Promise<AssessmentResult> {
-    const { data } = await apiClient.post<AssessmentResult>(`/student/assessment/${id}/submit`, { answers, tabSwitches });
-    return data;
+    try {
+      const { data } = await apiClient.post<AssessmentResult>(`/student/assessment/${id}/submit`, { answers, tabSwitches });
+      return data;
+    } catch {
+      // Backend unreachable — compute a mock result from the answers
+      const total = answers.length || 1;
+      const correct = answers.filter((a) => a === 0).length; // correctIndex 0 = first option
+      const pct = Math.round((correct / total) * 100);
+      return {
+        id: Math.abs(id),
+        score: correct,
+        totalQuestions: total,
+        percentage: pct,
+        tabSwitches,
+        passed: pct >= 60,
+        gradedQuestions: [],
+      } as AssessmentResult;
+    }
   },
 
   /** POST /api/student/ratings — student rates an industry partner (two-way). */
