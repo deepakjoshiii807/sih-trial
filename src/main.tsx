@@ -9,6 +9,7 @@ import { BrowserRouter, Route, Routes } from "react-router";
 import "./index.css";
 
 import AuthPage from "./pages/Auth.tsx";
+import StudentProfilePublic from "./pages/StudentProfilePublic";
 import LoginPage from "./pages/Login.tsx";
 import PrivacyPage from "./pages/Privacy.tsx";
 import TermsPage from "./pages/Terms.tsx";
@@ -42,6 +43,11 @@ createRoot(document.getElementById("root")!).render(
         <Route path="/login" element={<LoginPage />} />
         <Route path="/privacy" element={<PrivacyPage />} />
         <Route path="/terms" element={<TermsPage />} />
+
+        {/* Public, unauthenticated student profile. Rendered from bundled demo
+            data so it can be linked or shared without signing in. The live,
+            role-scoped profile stays behind RequireRole at /student. */}
+        <Route path="/student-profile" element={<StudentProfilePublic />} />
 
         {/* Authenticated, role-scoped dashboards. Every dashboard reads live
             data from the Django API, so each route is gated by RequireRole,
