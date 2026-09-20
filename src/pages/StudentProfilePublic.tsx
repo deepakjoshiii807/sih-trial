@@ -1,5 +1,6 @@
 import { Link } from "react-router";
 import { motion } from "framer-motion";
+import { usePageMeta } from "@/lib/use-page-meta";
 import {
   Award,
   ArrowRight,
@@ -154,6 +155,11 @@ function Card({
 }
 
 export default function StudentProfilePublic() {
+  usePageMeta(
+    "Aarav Sharma — Student Profile · Learn2Lead",
+    "Public student profile showing verified skills, evidence and skill gaps. Sign in to Learn2Lead to build your own profile.",
+  );
+
   const ringPct = DEMO_STUDENT.profileCompletion;
   const ringRadius = 34;
   const ringCircumference = 2 * Math.PI * ringRadius;

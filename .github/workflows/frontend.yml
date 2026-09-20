@@ -1,0 +1,51 @@
+name: Frontend CI
+
+# The Django workflow only runs for backend/** changes, so until now every
+# frontend pull request merged with no automated verification at all. This job
+# typechecks the app on any change that can affect it.
+
+on:
+  push:
+    paths:
+      - "src/**"
+      - "public/**"
+      - "index.html"
+      - "package.json"
+      - "bun.lock"
+      - "tsconfig.json"
+      - "tsconfig.app.json"
+      - "tsconfig.node.json"
+      - "vite.config.ts"
+      - ".github/workflows/frontend.yml"
+  pull_request:
+    paths:
+      - "src/**"
+      - "public/**"
+      - "index.html"
+      - "package.json"
+      - "bun.lock"
+      - "tsconfig.json"
+      - "tsconfig.app.json"
+      - "tsconfig.node.json"
+      - "vite.config.ts"
+      - ".github/workflows/frontend.yml"
+
+jobs:
+  typecheck:
+    name: TypeScript
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          # Matches the Bun major used for local development and previews.
+          bun-version: "1.x"
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Typecheck
+        run: bun tsc -b --noEmit
