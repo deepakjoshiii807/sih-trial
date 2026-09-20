@@ -48,6 +48,10 @@ createRoot(document.getElementById("root")!).render(
             data so it can be linked or shared without signing in. The live,
             role-scoped profile stays behind RequireRole at /student. */}
         <Route path="/student-profile" element={<StudentProfilePublic />} />
+        {/* Friendly aliases — visitors reach for these paths first, and landing
+            on the sign-in form instead is confusing. */}
+        <Route path="/profile" element={<StudentProfilePublic />} />
+        <Route path="/student/profile" element={<StudentProfilePublic />} />
 
         {/* Authenticated, role-scoped dashboards. Every dashboard reads live
             data from the Django API, so each route is gated by RequireRole,
