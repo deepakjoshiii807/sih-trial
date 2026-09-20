@@ -30,6 +30,8 @@ import ScholarshipPanel from "@/components/ui/scholarship-panel";
 import { enrichOpportunityMatch, type EnrichedMatch } from "@/lib/ai-opportunity-matcher";
 import { ModelDisclaimer } from "@/components/ui/ai-provenance";
 import { studentApi } from "@/lib/student-api";
+import { ResumeBuilderPanel } from "@/components/ui/resume-builder";
+import { ApplicationTimelinePanel } from "@/components/ui/application-timeline";
 import type {
   Student, SkillPassportItem, SkillGap, RoleReadinessProfile,
   SimulatorAction, RecommendedProject, Opportunity, Application,
@@ -131,6 +133,8 @@ const navLinks = [
   { id: "portfolio", label: "Portfolio", icon: <Grid3X3 size={18} /> },
   { id: "scholarships", label: "Scholarships", icon: <Award size={18} /> },
   { id: "optimizer", label: "AI Optimizer", icon: <Sparkles size={18} /> },
+  { id: "resume", label: "Resume Builder", icon: <FileText size={18} /> },
+  { id: "timeline", label: "Timeline", icon: <Clock size={18} /> },
 ];
 
 /* ─── Helpers ─── */
@@ -1572,6 +1576,8 @@ export default function StudentDashboard() {
       case "portfolio": return <PortfolioSection />;
       case "optimizer": return <ProfileOptimizerSection />;
       case "settings": return <SettingsSection />;
+      case "resume": return <ResumeBuilderPanel student={student} skills={skillPassport.items.map(s => ({ name: s.name, category: s.category, confidence: s.confidence, verified: s.origin === "evidence" }))} projects={recommendedProjects.slice(0, 5).map(p => ({ title: p.title, description: p.description, skills: [p.targetSkill], date: p.estimatedDuration }))} applications={applications.map(a => ({ role: a.role, org: a.org, stage: a.stage, match: a.match }))} />;
+      case "timeline": return <ApplicationTimelinePanel />;
       default: return <OverviewSection onExtractSkills={() => setExtractionOpen(true)} onUploadEvidence={() => setEvidenceOpen(true)} onNavigate={setActiveNav} />;
     }
   };
