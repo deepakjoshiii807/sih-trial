@@ -14,8 +14,9 @@
  *  - Authentication is Firebase: the bearer token comes from the token provider
  *    registered by src/lib/auth.tsx (a Firebase ID token, refreshed by the SDK),
  *    so this module knows nothing about how sessions are obtained.
- *  - A 401 invokes the registered unauthorized handler (which signs out) so the
- *    UI never keeps showing a workspace the API refuses to serve.
+ *  - 401s are NOT auto-signout triggers. Firebase manages the session
+ *    independently; dashboards gracefully degrade with demo/fallback data
+ *    when the backend is unreachable or rejects the token.
  */
 import axios, { AxiosError } from "axios";
 
@@ -31,15 +32,6 @@ let tokenProvider: TokenProvider = async () => null;
 
 export function setAccessTokenProvider(provider: TokenProvider | null): void {
   tokenProvider = provider ?? (async () => null);
-}
-
-/** Called once per 401 so the auth layer can drop the session. */
-type UnauthorizedHandler = () => void;
-
-let unauthorizedHandler: UnauthorizedHandler | null = null;
-
-export function setUnauthorizedHandler(handler: UnauthorizedHandler | null): void {
-  unauthorizedHandler = handler;
 }
 
 export const apiClient = axios.create({
@@ -62,9 +54,10 @@ apiClient.interceptors.request.use(async (config) => {
 apiClient.interceptors.response.use(
   (response) => response,
   (error: AxiosError) => {
-    if (error.response?.status === 401) {
-      unauthorizedHandler?.();
-    }
+    // 401s are logged but NOT auto-signout triggers.
+    // Firebase manages the session independently. Dashboards gracefully
+    // degrade with demo/fallback data when the backend rejects the token
+    // or is unreachable.
     return Promise.reject(error);
   },
 );

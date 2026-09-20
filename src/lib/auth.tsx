@@ -32,7 +32,6 @@ import {
   apiClient,
   apiErrorMessage,
   setAccessTokenProvider,
-  setUnauthorizedHandler,
 } from "./api-client";
 import { firebaseConfigured, getFirebaseAuth, getGoogleProvider } from "./firebase";
 
@@ -259,21 +258,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  /*
-   * A 401 from the API means the Firebase session is gone or the backend
-   * rejected the ID token — drop the local session so the UI cannot present a
-   * workspace the API will not serve.
-   */
-  useEffect(() => {
-    setUnauthorizedHandler(() => {
-      void (async () => {
-        const auth = await getFirebaseAuth();
-        await auth?.signOut().catch(() => undefined);
-        setUser(null);
-      })();
-    });
-    return () => setUnauthorizedHandler(null);
-  }, []);
+
 
   const adopt = useCallback((next: AuthUser): AuthUser => {
     setUser(next);
