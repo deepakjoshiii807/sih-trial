@@ -184,7 +184,7 @@ export function SmartMatchScore({ opportunityTitle }: { opportunityTitle?: strin
   return (
     <div className="space-y-5">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+      <div className="flex items-center gap-3">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-lg grid place-items-center" style={{ background: "linear-gradient(135deg, #244B35, #1C3D2B)" }}>
             <Sparkles size={16} style={{ color: "#DCE6D0" }} />
@@ -209,27 +209,27 @@ export function SmartMatchScore({ opportunityTitle }: { opportunityTitle?: strin
       </div>
 
       {/* Stats row */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-4 gap-4">
         <div className="text-center p-3 rounded-xl" style={{ background: "#F7F6F0" }}>
-          <div className="font-bold text-xl" style={{ color: "#244B35" }}>{DEMO_CANDIDATES.length}</div>
-          <div className="text-[9px] font-mono tracking-widest uppercase" style={{ color: "#9A9D94" }}>Candidates</div>
+          <div className="font-bold text-2xl" style={{ color: "#244B35" }}>{DEMO_CANDIDATES.length}</div>
+          <div className="text-[10px] font-semibold uppercase tracking-wide mt-0.5" style={{ color: "#9A9D94" }}>Candidates</div>
         </div>
         <div className="text-center p-3 rounded-xl" style={{ background: "#F7F6F0" }}>
-          <div className="font-bold text-xl" style={{ color: "#C98B5F" }}>{Math.round(DEMO_CANDIDATES.reduce((s, c) => s + c.overallScore, 0) / DEMO_CANDIDATES.length)}</div>
-          <div className="text-[9px] font-mono tracking-widest uppercase" style={{ color: "#9A9D94" }}>Avg Score</div>
+          <div className="font-bold text-2xl" style={{ color: "#C98B5F" }}>{Math.round(DEMO_CANDIDATES.reduce((s, c) => s + c.overallScore, 0) / DEMO_CANDIDATES.length)}</div>
+          <div className="text-[10px] font-semibold uppercase tracking-wide mt-0.5" style={{ color: "#9A9D94" }}>Avg Score</div>
         </div>
         <div className="text-center p-3 rounded-xl" style={{ background: "#F7F6F0" }}>
-          <div className="font-bold text-xl" style={{ color: "#244B35" }}>{DEMO_CANDIDATES.filter(c => c.overallScore >= 85).length}</div>
-          <div className="text-[9px] font-mono tracking-widest uppercase" style={{ color: "#9A9D94" }}>Strong Fits</div>
+          <div className="font-bold text-2xl" style={{ color: "#244B35" }}>{DEMO_CANDIDATES.filter(c => c.overallScore >= 85).length}</div>
+          <div className="text-[10px] font-semibold uppercase tracking-wide mt-0.5" style={{ color: "#9A9D94" }}>Strong Fits</div>
         </div>
         <div className="text-center p-3 rounded-xl" style={{ background: "#F7F6F0" }}>
-          <div className="font-bold text-xl" style={{ color: "#8A6FB8" }}>{DEMO_CANDIDATES.reduce((s, c) => s + c.matchedSkills.length, 0)}</div>
-          <div className="text-[9px] font-mono tracking-widest uppercase" style={{ color: "#9A9D94" }}>Skill Matches</div>
+          <div className="font-bold text-2xl" style={{ color: "#8A6FB8" }}>{DEMO_CANDIDATES.reduce((s, c) => s + c.matchedSkills.length, 0)}</div>
+          <div className="text-[10px] font-semibold uppercase tracking-wide mt-0.5" style={{ color: "#9A9D94" }}>Skill Matches</div>
         </div>
       </div>
 
       {/* Filters & Sort */}
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex items-center gap-2 flex-nowrap overflow-x-auto pb-1">
         <div className="flex items-center gap-1">
           <Filter size={12} style={{ color: "#9A9D94" }} />
           <span className="text-[10px] font-semibold" style={{ color: "#6B6F68" }}>Status:</span>
@@ -254,14 +254,14 @@ export function SmartMatchScore({ opportunityTitle }: { opportunityTitle?: strin
       </div>
 
       {/* Charts row */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Bar chart */}
         <div className="lg:col-span-2 border rounded-xl p-4" style={{ borderColor: "#E6E3D7" }}>
           <h4 className="text-[11px] font-semibold mb-3 flex items-center gap-1.5" style={{ color: "#6B6F68" }}>
             <BarChart3 size={12} /> Score Distribution
           </h4>
-          <ResponsiveContainer width="100%" height={160}>
-            <BarChart data={distributionData} barGap={2}>
+          <ResponsiveContainer width="100%" height={200}>
+            <BarChart data={distributionData} barGap={4}>
               <XAxis dataKey="name" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fontSize: 9 }} domain={[0, 100]} axisLine={false} tickLine={false} width={28} />
               <Tooltip contentStyle={{ fontSize: 10, borderRadius: 8, border: "1px solid #E6E3D7" }} />
@@ -276,7 +276,7 @@ export function SmartMatchScore({ opportunityTitle }: { opportunityTitle?: strin
         {/* Status pie */}
         <div className="border rounded-xl p-4" style={{ borderColor: "#E6E3D7" }}>
           <h4 className="text-[11px] font-semibold mb-3" style={{ color: "#6B6F68" }}>Pipeline Status</h4>
-          <ResponsiveContainer width="100%" height={160}>
+          <ResponsiveContainer width="100%" height={200}>
             <PieChart>
               <Pie data={statusBreakdown} cx="50%" cy="50%" innerRadius={35} outerRadius={60} paddingAngle={3} dataKey="value">
                 {statusBreakdown.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
@@ -397,7 +397,7 @@ export function SmartMatchScore({ opportunityTitle }: { opportunityTitle?: strin
                   </div>
                 </div>
                 {/* Score chips */}
-                <div className="hidden sm:flex items-center gap-3">
+                <div className="hidden md:flex items-center gap-4">
                   <div className="text-center">
                     <div className="font-bold text-[13px]" style={{ color: "#244B35" }}>{c.skillMatch}%</div>
                     <div className="text-[9px] font-mono tracking-wider uppercase" style={{ color: "#9A9D94" }}>Skill</div>
@@ -412,7 +412,7 @@ export function SmartMatchScore({ opportunityTitle }: { opportunityTitle?: strin
                   </div>
                 </div>
                 {/* Matched skills preview */}
-                <div className="hidden lg:flex flex-wrap gap-1 max-w-[200px]">
+                <div className="hidden xl:flex flex-wrap gap-1 max-w-[200px]">
                   {c.matchedSkills.slice(0, 3).map(s => (
                     <span key={s} className="px-1.5 py-0.5 rounded text-[9px] font-medium" style={{ background: "#DCE6D0", color: "#16301F" }}>{s}</span>
                   ))}
