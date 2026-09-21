@@ -8,7 +8,7 @@ import {
   AlertTriangle, ChevronRight, Star, Settings, LogOut, Search, Bell,
   Target, Zap, BookOpen, Award, ClipboardCheck, Eye, ArrowRight,
   Briefcase, FlaskConical, Lightbulb, MapPin, Calendar, Clock,
-  Save, Mail, Globe, Smartphone, Trash2, Lock,
+  Save, Mail, Globe, Smartphone, Trash2, Lock, Building2, Handshake,
 } from "lucide-react";
 
 import type {
@@ -18,6 +18,10 @@ import type {
 } from "@/lib/faculty-api";
 import { facultyApi } from "@/lib/faculty-api";
 import FacultyAIQueue from "@/components/ui/faculty-ai-queue";
+import FDPListings from "@/components/ui/fdp-listings";
+import IndustrialTraining from "@/components/ui/industrial-training";
+import ConsultancyOpportunities from "@/components/ui/consultancy-opportunities";
+import ResearchCollaboration from "@/components/ui/research-collaboration";
 import PrintButton from "@/components/ui/print-button";
 import DemandTimeline from "@/components/ui/charts/demand-timeline";
 import { StudentProgressTracker } from "@/components/ui/student-progress-tracker";
@@ -127,6 +131,10 @@ const navLinks = [
   { id: "verification", label: "Student Verification", icon: <ClipboardCheck size={18} />, count: 4 },
   { id: "projects", label: "Project Review", icon: <FileText size={18} /> },
   { id: "opportunities", label: "Opportunities", icon: <Briefcase size={18} /> },
+  { id: "fdp", label: "FDP Listings", icon: <BookOpen size={18} /> },
+  { id: "industrial-training", label: "Industrial Training", icon: <Building2 size={18} /> },
+  { id: "consultancy", label: "Consultancy", icon: <Handshake size={18} /> },
+  { id: "research", label: "Research Collaboration", icon: <FlaskConical size={18} /> },
   { id: "curriculum-loop", label: "Curriculum Loop", icon: <FlaskConical size={18} /> },
   { id: "analytics", label: "Analytics", icon: <BarChart3 size={18} /> },
   { id: "progress", label: "Student Progress", icon: <TrendingUp size={18} /> },
@@ -809,6 +817,10 @@ export default function FacultyDashboard() {
       case "opportunities": return <OpportunitiesSection />;
       case "curriculum-loop": return <CurriculumLoopSection />;
       case "analytics": return <AnalyticsSection />;
+      case "fdp": return <FDPListings />;
+      case "industrial-training": return <IndustrialTraining />;
+      case "consultancy": return <ConsultancyOpportunities />;
+      case "research": return <ResearchCollaboration />;
       case "progress": return <StudentProgressTracker />;
       case "profile": return <ProfileSection />;
       case "settings": return <SettingsSection />;
