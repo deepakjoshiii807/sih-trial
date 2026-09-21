@@ -27,13 +27,32 @@ import { MessagingSystem } from "@/components/ui/messaging-system";
  *  All start empty; the dashboard skeleton renders during the fetch, so users
  *  never see stale seed data. Hydration mutates these and LiveDashboard
  *  triggers a React re-render, which reads the updated values. */
-let company: Company = { name: "", initials: "", description: "", domain: "", orgType: "", location: "", website: "", email: "", phone: "", contactPerson: "", verified: false, foundedYear: 0, size: "" };
-let opportunities: Opportunity[] = [];
-let applications: Application[] = [];
-let slaTrackers: SLATracker[] = [];
-let analytics: IndustryAnalytics = { totalOpportunities: 0, activeOpportunities: 0, totalApplicants: 0, shortlistingRate: 0, fillRate: 0, avgTimeToHire: 0, pipeline: [], topCandidateSkills: [], applicantSkillGaps: [], monthlyTrend: [], opportunityPerformance: [] };
-let ratings: Rating[] = [];
-let reputation: Reputation = { avgScore: 0, count: 0, reviews: [] };
+let company: Company = { name: "CCRAS Research Hub", initials: "CR", description: "Central Council for Research in Ayurvedic Sciences — leading government research organization in AYUSH healthcare.", domain: "healthcare-research", orgType: "Government Research Council", location: "New Delhi, India", website: "https://ccras.nic.in", email: "careers@ccras.gov.in", phone: "+91-11-24123456", contactPerson: "Dr. Rajesh Sharma", verified: true, foundedYear: 1978, size: "500-1000" };
+let opportunities: Opportunity[] = [
+  { id: 1, title: "Research Intern — Clinical Data Analysis", type: "Internship", description: "Analyze clinical trial datasets using Python and R. Work with real AYUSH research data and contribute to published papers.", openings: 4, location: "New Delhi", workArrangement: "On-site", duration: "3 months", stipend: "₹15,000/month", deadline: "Oct 30, 2025", eligibility: { qualification: "BAMS", experience: "None", otherCriteria: "", courses: ["BAMS", "MD/MS"] }, requiredSkills: [{ skill: "Python", required: "essential" }, { skill: "Data Analysis", required: "essential" }, { skill: "Statistical Analysis", required: "preferred" }, { skill: "Clinical Research", required: "preferred" }], status: "active", totalApplicants: 12, shortlistedCount: 5, createdAt: "Sep 1, 2025", blindShortlisting: true, slaAwaiting: 2, slaBreached: false },
+  { id: 2, title: "Machine Learning Engineer — Herbal Drug Discovery", type: "Placement", description: "Build ML models for predicting herbal drug efficacy using molecular fingerprints and traditional knowledge databases.", openings: 2, location: "New Delhi", workArrangement: "Hybrid", duration: "6 months", stipend: "₹25,000/month", deadline: "Nov 15, 2025", eligibility: { qualification: "BAMS/B.Tech", experience: "None", otherCriteria: "", courses: ["BAMS", "B.Tech"] }, requiredSkills: [{ skill: "Machine Learning", required: "essential" }, { skill: "Python", required: "essential" }, { skill: "Data Analysis", required: "essential" }, { skill: "Scientific Writing", required: "preferred" }], status: "active", totalApplicants: 8, shortlistedCount: 3, createdAt: "Aug 20, 2025", blindShortlisting: false, slaAwaiting: 1, slaBreached: false },
+  { id: 3, title: "Scientific Writing Intern — Pharmacovigilance", type: "Internship", description: "Write adverse event reports and pharmacovigilance documentation for AYUSH drug safety monitoring.", openings: 3, location: "Remote", workArrangement: "Remote", duration: "2 months", stipend: "₹10,000/month", deadline: "Oct 15, 2025", eligibility: { qualification: "BAMS", experience: "None", otherCriteria: "", courses: ["BAMS", "Pharm.D"] }, requiredSkills: [{ skill: "Scientific Writing", required: "essential" }, { skill: "Pharmacology", required: "preferred" }, { skill: "Clinical Research", required: "preferred" }], status: "active", totalApplicants: 15, shortlistedCount: 7, createdAt: "Sep 5, 2025", blindShortlisting: true, slaAwaiting: 0, slaBreached: true },
+  { id: 4, title: "Data Scientist — EHR Analytics Platform", type: "Placement", description: "Design and implement analytics dashboards for electronic health records across AYUSH institutions.", openings: 2, location: "Hyderabad", workArrangement: "On-site", duration: "12 months", stipend: "₹30,000/month", deadline: "Dec 1, 2025", eligibility: { qualification: "BAMS/B.Tech", experience: "None", otherCriteria: "", courses: ["BAMS", "B.Tech", "MCA"] }, requiredSkills: [{ skill: "Data Analysis", required: "essential" }, { skill: "Python", required: "essential" }, { skill: "REST APIs", required: "preferred" }, { skill: "Machine Learning", required: "preferred" }], status: "paused", totalApplicants: 6, shortlistedCount: 2, createdAt: "Jul 15, 2025", blindShortlisting: false, slaAwaiting: 0, slaBreached: false },
+];
+let applications: Application[] = [
+  { id: 1, candidate: { id: 101, name: "Aarav Sharma", initials: "AS", course: "BAMS", year: "3rd Year", institution: "AIIA New Delhi", skills: [{ name: "Python", confidence: 92, verified: true }, { name: "Data Analysis", confidence: 85, verified: true }, { name: "Clinical Research", confidence: 70, verified: true }, { name: "Statistical Analysis", confidence: 55, verified: false }], verifiedSkills: 5, totalSkills: 5, projects: 2, certifications: 3, evidence: [{ type: "Project", title: "Clinical Trial Analysis", issuer: "AIIA", date: "Aug 2025", verified: true }], roleReadiness: "Ready", readinessScore: 87 }, opportunityId: 1, opportunityTitle: "Research Intern — Clinical Data Analysis", matchScore: 94, matchedSkills: ["Python", "Data Analysis", "Clinical Research"], missingSkills: ["Statistical Analysis"], stage: "shortlisted", appliedDate: "Sep 5, 2025", lastUpdated: "Sep 10, 2025", notes: "Strong Python skills. Verified by faculty." },
+  { id: 2, candidate: { id: 102, name: "Priya Desai", initials: "PD", course: "BAMS", year: "4th Year", institution: "BHU Varanasi", skills: [{ name: "Machine Learning", confidence: 88, verified: true }, { name: "Python", confidence: 95, verified: true }, { name: "Scientific Writing", confidence: 72, verified: true }], verifiedSkills: 7, totalSkills: 7, projects: 2, certifications: 2, evidence: [{ type: "Research Paper", title: "ML in Drug Discovery", issuer: "BHU", date: "Jul 2025", verified: true }], roleReadiness: "Ready", readinessScore: 92 }, opportunityId: 2, opportunityTitle: "Machine Learning Engineer — Herbal Drug Discovery", matchScore: 91, matchedSkills: ["Machine Learning", "Python", "Scientific Writing"], missingSkills: [], stage: "interviewed", appliedDate: "Aug 28, 2025", lastUpdated: "Sep 8, 2025", notes: "Excellent ML portfolio. Interview scheduled." },
+  { id: 3, candidate: { id: 103, name: "Ravi Kumar", initials: "RK", course: "BAMS", year: "2nd Year", institution: "AIIA New Delhi", skills: [{ name: "Scientific Writing", confidence: 78, verified: true }, { name: "Clinical Research", confidence: 65, verified: true }], verifiedSkills: 3, totalSkills: 3, projects: 2, certifications: 1, evidence: [{ type: "Certificate", title: "Medical Writing Workshop", issuer: "NCISM", date: "Jun 2025", verified: true }], roleReadiness: "Almost Ready", readinessScore: 68 }, opportunityId: 3, opportunityTitle: "Scientific Writing Intern — Pharmacovigilance", matchScore: 78, matchedSkills: ["Scientific Writing", "Clinical Research"], missingSkills: ["Pharmacology"], stage: "applied", appliedDate: "Sep 12, 2025", lastUpdated: "Sep 12, 2025", notes: "" },
+  { id: 4, candidate: { id: 104, name: "Sneha Patel", initials: "SP", course: "B.Tech CSE", year: "3rd Year", institution: "IIT Delhi", skills: [{ name: "Data Analysis", confidence: 90, verified: true }, { name: "Python", confidence: 88, verified: true }, { name: "REST APIs", confidence: 75, verified: true }], verifiedSkills: 6, totalSkills: 6, projects: 2, certifications: 4, evidence: [{ type: "Internship", title: "Data Analyst Intern", issuer: "TechCorp", date: "May 2025", verified: true }], roleReadiness: "Ready", readinessScore: 89 }, opportunityId: 4, opportunityTitle: "Data Scientist — EHR Analytics Platform", matchScore: 86, matchedSkills: ["Data Analysis", "Python", "REST APIs"], missingSkills: ["Machine Learning"], stage: "offered", appliedDate: "Jul 20, 2025", lastUpdated: "Aug 15, 2025", notes: "Offer sent. Awaiting acceptance." },
+];
+let slaTrackers: SLATracker[] = [
+  { applicationId: 3, candidateName: "Ravi Kumar", opportunityTitle: "Scientific Writing Intern — Pharmacovigilance", appliedDate: "Sep 12, 2025", respondBy: "Sep 19, 2025", timeRemaining: "2 days left", slaStatus: "warning", daysRemaining: 2 },
+  { applicationId: 5, candidateName: "Amit Singh", opportunityTitle: "Research Intern — Clinical Data Analysis", appliedDate: "Sep 8, 2025", respondBy: "Sep 15, 2025", timeRemaining: "Breached", slaStatus: "breached", daysRemaining: -1 },
+  { applicationId: 6, candidateName: "Deepa Nair", opportunityTitle: "Machine Learning Engineer — Herbal Drug Discovery", appliedDate: "Sep 14, 2025", respondBy: "Sep 21, 2025", timeRemaining: "5 days left", slaStatus: "on-track", daysRemaining: 5 },
+];
+let analytics: IndustryAnalytics = { totalOpportunities: 4, activeOpportunities: 3, totalApplicants: 41, shortlistingRate: 41, fillRate: 12, avgTimeToHire: 18, pipeline: [{ stage: "Applied", count: 41 }, { stage: "Shortlisted", count: 17 }, { stage: "Interviewed", count: 8 }, { stage: "Offered", count: 5 }, { stage: "Joined", count: 3 }], topCandidateSkills: [{ skill: "Python", count: 28, pct: 68 }, { skill: "Data Analysis", count: 22, pct: 54 }, { skill: "Clinical Research", count: 18, pct: 44 }, { skill: "Machine Learning", count: 12, pct: 29 }, { skill: "Scientific Writing", count: 10, pct: 24 }], applicantSkillGaps: [{ skill: "Statistical Analysis", gapCount: 18, pct: 44 }, { skill: "Machine Learning", gapCount: 15, pct: 37 }, { skill: "REST APIs", gapCount: 12, pct: 29 }, { skill: "Pharmacology", gapCount: 10, pct: 24 }, { skill: "Data Management", gapCount: 8, pct: 20 }], monthlyTrend: [{ month: "May", applicants: 8, shortlisted: 3, hired: 1 }, { month: "Jun", applicants: 12, shortlisted: 5, hired: 2 }, { month: "Jul", applicants: 10, shortlisted: 4, hired: 1 }, { month: "Aug", applicants: 15, shortlisted: 6, hired: 2 }, { month: "Sep", applicants: 11, shortlisted: 5, hired: 0 }], opportunityPerformance: [{ title: "Clinical Data Analysis", applicants: 12, fillRate: 75, avgMatch: 82 }, { title: "ML Herbal Drug Discovery", applicants: 8, fillRate: 50, avgMatch: 78 }, { title: "Pharmacovigilance Writing", applicants: 15, fillRate: 40, avgMatch: 65 }, { title: "EHR Analytics", applicants: 6, fillRate: 33, avgMatch: 71 }] };
+let ratings: Rating[] = [
+  { id: 1, from: "Aarav Sharma", fromType: "student", to: "CCRAS", toType: "industry", score: 5, feedback: "Excellent research environment. Great mentorship from Dr. Sharma's team. The clinical data analysis work was real and impactful.", opportunity: "Research Intern — Clinical Data Analysis", date: "Sep 2025" },
+  { id: 2, from: "Priya Desai", fromType: "student", to: "CCRAS", toType: "industry", score: 4, feedback: "Good ML infrastructure. Could improve on documentation for new joins. The herbal drug database project was fascinating.", opportunity: "Machine Learning Engineer — Herbal Drug Discovery", date: "Aug 2025" },
+  { id: 3, from: "CCRAS HR Team", fromType: "industry", to: "Aarav Sharma", toType: "student", score: 5, feedback: "Outstanding performance. Aarav independently implemented a clinical trial analysis pipeline. Strong Python skills and domain knowledge.", opportunity: "Research Intern — Clinical Data Analysis", date: "Sep 2025" },
+  { id: 4, from: "CCRAS HR Team", fromType: "industry", to: "Priya Desai", toType: "student", score: 4, feedback: "Excellent ML skills. Built a molecular fingerprint predictor with 89% accuracy. Good scientific writing for the research paper.", opportunity: "Machine Learning Engineer — Herbal Drug Discovery", date: "Aug 2025" },
+];
+let reputation: Reputation = { avgScore: 4.5, count: 4, reviews: [] };
 
 /** Server data entry point (called by the route-level LiveDashboard wrapper).
  *  Mutates the module-scope holders so the next React render picks up live data. */
@@ -391,7 +410,7 @@ function ApplicationsSection() {
             <div className="flex items-start justify-between mb-3">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl grid place-items-center font-bold text-sm" style={{ background: "#EDEBE0", color: "#171A18" }}>{app.candidate.initials}</div>
-                <div><div className="font-bold text-[15px]">{app.candidate.name}</div><div className="font-mono text-[11px]" style={{ color: "#6B6F68" }}>{app.candidate.course} / {app.candidate.institution}</div></div>
+                <div><div className="font-bold text-[15px]">{app.candidate.name}</div><div className="font-mono text-[11px]" style={{ color: "#6B6F68" }}>{app.candidate.course} / {opportunities.find(o => o.id === app.opportunityId)?.blindShortlisting ? "[Hidden]" : app.candidate.institution}</div></div>
               </div>
               <div className="text-right"><div className="font-bold text-xl" style={{ color: app.matchScore >= 90 ? "#244B35" : "#C98B5F" }}>{app.matchScore}%</div><div className="font-mono text-[9px] tracking-widest uppercase" style={{ color: "#9A9D94" }}>match</div></div>
             </div>
@@ -439,7 +458,7 @@ function MatchingSection() {
           <div key={app.id} className="border rounded-[14px] p-5 transition-all hover:shadow-md hover:-translate-y-0.5" style={{ borderColor: idx === 0 ? "#244B35" : "#E6E3D7", boxShadow: idx === 0 ? "0 2px 8px rgba(36,75,53,.08)" : undefined }}>
             <div className="flex items-center gap-3 mb-3">
               <div className="w-10 h-10 rounded-xl grid place-items-center font-bold text-sm" style={{ background: idx === 0 ? "#244B35" : "#EDEBE0", color: idx === 0 ? "#DCE6D0" : "#171A18" }}>{app.candidate.initials}</div>
-              <div className="flex-1 min-w-0"><div className="font-bold text-[15px]">{app.candidate.name}</div><div className="font-mono text-[11px]" style={{ color: "#6B6F68" }}>{app.candidate.course} / {app.candidate.year} / {app.candidate.institution}</div></div>
+              <div className="flex-1 min-w-0"><div className="font-bold text-[15px]">{app.candidate.name}</div><div className="font-mono text-[11px]" style={{ color: "#6B6F68" }}>{app.candidate.course} / {app.candidate.year} / {opportunities.find(o => o.id === app.opportunityId)?.blindShortlisting ? "[Hidden]" : app.candidate.institution}</div></div>
               <div className="text-right"><div className="font-bold text-2xl" style={{ color: app.matchScore >= 90 ? "#244B35" : app.matchScore >= 80 ? "#C98B5F" : "#B99A22" }}>{app.matchScore}%</div><div className="font-mono text-[9px] tracking-widest uppercase" style={{ color: "#9A9D94" }}>match</div></div>
             </div>
             <div className="grid grid-cols-3 gap-3 mb-3 text-center">
@@ -469,6 +488,18 @@ function MatchingSection() {
 function AnalyticsSection() {
   return (
     <>
+      <motion.section initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }}
+        className="col-span-12 rounded-[20px] border p-7 bg-white relative overflow-hidden" style={{ borderColor: "#E6E3D7", boxShadow: "0 1px 3px rgba(0,0,0,.04)" }}>
+        <div className="absolute top-0 left-0 w-full h-1" style={{ background: "linear-gradient(90deg, #244B35, #E8D36B, #C98B5F, #8A6FB8)" }} />
+        <Eyebrow>Key Metrics</Eyebrow>
+        <div className="font-semibold text-[19px] tracking-tight mt-2 mb-5">Hiring Performance</div>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-2">
+          <div className="text-center p-3 rounded-xl" style={{ background: "#EDEBE0" }}><div className="font-bold text-2xl" style={{ color: "#244B35" }}>{analytics.avgTimeToHire}</div><div className="font-mono text-[9px] tracking-widest uppercase" style={{ color: "#9A9D94" }}>Days to Hire</div></div>
+          <div className="text-center p-3 rounded-xl" style={{ background: "#EDEBE0" }}><div className="font-bold text-2xl" style={{ color: "#C98B5F" }}>{analytics.fillRate}%</div><div className="font-mono text-[9px] tracking-widest uppercase" style={{ color: "#9A9D94" }}>Fill Rate</div></div>
+          <div className="text-center p-3 rounded-xl" style={{ background: "#EDEBE0" }}><div className="font-bold text-2xl" style={{ color: "#8A6FB8" }}>{analytics.shortlistingRate}%</div><div className="font-mono text-[9px] tracking-widest uppercase" style={{ color: "#9A9D94" }}>Shortlist Rate</div></div>
+          <div className="text-center p-3 rounded-xl" style={{ background: "#EDEBE0" }}><div className="font-bold text-2xl" style={{ color: "#B99A22" }}>{analytics.totalApplicants}</div><div className="font-mono text-[9px] tracking-widest uppercase" style={{ color: "#9A9D94" }}>Total Applicants</div></div>
+        </div>
+      </motion.section>
       <motion.section initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }}
         className="col-span-12 lg:col-span-7 rounded-[20px] border p-7 bg-white relative overflow-hidden" style={{ borderColor: "#DED6EC", boxShadow: "0 1px 3px rgba(0,0,0,.04)" }}>
         <div className="absolute top-0 left-0 w-full h-1" style={{ background: "linear-gradient(90deg, #8A6FB8, #C8B5DE)" }} />
@@ -521,13 +552,21 @@ function AnalyticsSection() {
    SECTION: SLA Tracker
    ═══════════════════════════════════════════════════════ */
 function SLASection() {
+  const breachedCount = slaTrackers.filter(s => s.slaStatus === "breached").length;
+  const warningCount = slaTrackers.filter(s => s.slaStatus === "warning").length;
   return (
     <motion.section initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }}
       className="col-span-12 rounded-[20px] border p-7 bg-white relative overflow-hidden" style={{ borderColor: "#E6DDD5", boxShadow: "0 1px 3px rgba(0,0,0,.04)" }}>
       <div className="absolute top-0 left-0 w-full h-1" style={{ background: "linear-gradient(90deg, #C98B5F, #E8D36B)" }} />
       <Eyebrow color="#C98B5F">SLA Tracker</Eyebrow>
       <div className="font-semibold text-[19px] tracking-tight mt-2 mb-0.5">Application Response SLA</div>
-      <div className="text-[13px] mb-5" style={{ color: "#6B6F68" }}>Industry must respond within 7 days of an application — breaches auto-flag the listing as stale.</div>
+      <div className="text-[13px] mb-3" style={{ color: "#6B6F68" }}>Industry must respond within 7 days of an application — breaches auto-flag the listing as stale.</div>
+      {(breachedCount > 0 || warningCount > 0) && (
+        <div className="flex items-center gap-3 p-3 mb-4 rounded-xl text-sm font-medium" style={{ background: breachedCount > 0 ? "#FFF5F5" : "#FFFBEB", color: breachedCount > 0 ? "#991B1B" : "#92400E", border: breachedCount > 0 ? "1px solid #FECACA" : "1px solid #FDE68A" }}>
+          <Bell size={16} />
+          <span>{breachedCount > 0 ? breachedCount + " application(s) have breached SLA. " : ""}{warningCount > 0 ? warningCount + " application(s) approaching deadline." : ""} Review and respond promptly.</span>
+        </div>
+      )}
       {slaTrackers.length === 0 ? (
         <div className="text-center py-8"><Check size={32} style={{ color: "#244B35", margin: "0 auto 8px" }} /><div className="font-semibold text-sm">All caught up!</div><div className="text-[13px]" style={{ color: "#9A9D94" }}>No pending SLA deadlines</div></div>
       ) : (
@@ -555,14 +594,49 @@ function SLASection() {
 /* ═══════════════════════════════════════════════════════
    SECTION: Ratings
    ═══════════════════════════════════════════════════════ */
-function RatingsSection() {
+function RatingFormModal({ onClose }: { onClose: () => void }) {
+  const [score, setScore] = useState(5);
+  const [feedback, setFeedback] = useState("");
+  const [toName, setToName] = useState("");
+  const [opportunity, setOpportunity] = useState("");
+  const [saving, setSaving] = useState(false);
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!toName.trim() || !feedback.trim()) { toast.error("Please fill all fields."); return; }
+    setSaving(true);
+    try {
+      await industryApi.submitRating({ from: company.name, fromType: "industry" as const, to: toName.trim(), toType: "student" as const, score, feedback: feedback.trim(), opportunity: opportunity || "", date: new Date().toLocaleDateString("en-US", { month: "short", year: "numeric" }) });
+      toast.success("Rating submitted!");
+      onClose();
+    } catch { toast.error("Could not submit rating."); } finally { setSaving(false); }
+  };
+  const inputCls = "w-full border rounded-xl px-4 py-3 text-sm font-medium outline-none transition-colors focus:border-[#244B35]";
+  const inputStyle = { borderColor: "#E6E3D7", background: "#FAF9F5", color: "#171A18" } as const;
+  const labelCls = "font-mono text-[10px] font-bold tracking-[0.14em] uppercase mb-1.5 block";
   return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,.4)" }} onClick={onClose}>
+      <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="w-full max-w-lg rounded-2xl p-6 bg-white shadow-2xl" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-5"><div className="font-bold text-lg" style={{ color: "#171A18" }}>Rate Intern</div><button onClick={onClose} className="text-[#6B6F68] hover:text-[#171A18] text-xl">&times;</button></div>
+        <form onSubmit={e => void handleSubmit(e)} className="space-y-4">
+          <div><label className={labelCls} style={{ color: "#6B6F68" }}>Student Name *</label><input className={inputCls} style={inputStyle} value={toName} onChange={e => setToName(e.target.value)} placeholder="e.g. Aarav Sharma" /></div>
+          <div><label className={labelCls} style={{ color: "#6B6F68" }}>Opportunity</label><input className={inputCls} style={inputStyle} value={opportunity} onChange={e => setOpportunity(e.target.value)} placeholder="e.g. Research Intern — Clinical Data Analysis" /></div>
+          <div><label className={labelCls} style={{ color: "#6B6F68" }}>Rating *</label><div className="flex gap-2 items-center">{[1, 2, 3, 4, 5].map(i => <button key={i} type="button" onClick={() => setScore(i)} className="transition-transform hover:scale-110"><Star size={28} style={{ color: i <= score ? "#E8D36B" : "#E6E3D7", fill: i <= score ? "#E8D36B" : "none" }} /></button>)}<span className="font-bold text-lg ml-2" style={{ color: "#171A18" }}>{score}/5</span></div></div>
+          <div><label className={labelCls} style={{ color: "#6B6F68" }}>Feedback *</label><textarea className={inputCls} style={{ ...inputStyle, minHeight: 100 }} value={feedback} onChange={e => setFeedback(e.target.value)} placeholder="Describe the intern performance, strengths, and areas for improvement..." /></div>
+          <div className="flex gap-3 pt-2"><button type="button" onClick={onClose} className="flex-1 font-semibold text-[13px] py-2.5 rounded-xl border transition-all hover:bg-[#EFEDE3]" style={{ borderColor: "#E6E3D7" }}>Cancel</button><button type="submit" disabled={saving} className="flex-1 font-semibold text-[13px] py-2.5 rounded-xl transition-all disabled:opacity-50" style={{ background: "linear-gradient(135deg, #E8D36B, #C98B5F)", color: "#171A18" }}>{saving ? "Submitting..." : "Submit Rating"}</button></div>
+        </form>
+      </motion.div>
+    </div>
+  );
+}
+
+function RatingsSection() {
+  const [showRateModal, setShowRateModal] = useState(false);
+  return (
+    <>
     <motion.section initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }}
       className="col-span-12 rounded-[20px] border p-7 bg-white relative overflow-hidden" style={{ borderColor: "#DED6EC", boxShadow: "0 1px 3px rgba(0,0,0,.04)" }}>
       <div className="absolute top-0 left-0 w-full h-1" style={{ background: "linear-gradient(90deg, #E8D36B, #C98B5F)" }} />
-      <Eyebrow>Ratings</Eyebrow>
-      <div className="font-semibold text-[19px] tracking-tight mt-2 mb-0.5">Two-Way Ratings & Feedback</div>
-      <div className="text-[13px] mb-5" style={{ color: "#6B6F68" }}>Mutual feedback after internship completion</div>
+      <div className="flex items-center justify-between mb-1"><div><Eyebrow>Ratings</Eyebrow><div className="font-semibold text-[19px] tracking-tight mt-2 mb-0.5">Two-Way Ratings & Feedback</div><div className="text-[13px]" style={{ color: "#6B6F68" }}>Mutual feedback after internship completion</div></div><button onClick={() => setShowRateModal(true)} className="inline-flex items-center gap-1.5 font-semibold text-[13px] px-4 py-2.5 rounded-xl transition-all hover:-translate-y-0.5 hover:shadow-md" style={{ background: "linear-gradient(135deg, #E8D36B, #C98B5F)", color: "#171A18" }}><Star size={14} /> Rate Intern</button></div>
       <div className="flex items-center gap-4 p-4 mb-5 rounded-[14px] border" style={{ borderColor: "#E8D36B60", background: "#FDFBF0" }}>
         <div className="flex gap-0.5">{[1, 2, 3, 4, 5].map((i) => <Star key={i} size={18} style={{ color: i <= Math.round(reputation.avgScore) ? "#E8D36B" : "#E6E3D7", fill: i <= Math.round(reputation.avgScore) ? "#E8D36B" : "none" }} />)}</div>
         <div className="flex-1">
@@ -586,6 +660,8 @@ function RatingsSection() {
         ))}
       </div>
     </motion.section>
+    {showRateModal && <RatingFormModal onClose={() => setShowRateModal(false)} />}
+    </>
   );
 }
 
