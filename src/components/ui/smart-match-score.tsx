@@ -187,7 +187,7 @@ export function SmartMatchScore({ opportunityTitle }: { opportunityTitle?: strin
   const handleReject = (name: string) => { toast.info(`${name} removed from consideration.`); };
 
   return (
-    <div className="space-y-5">
+    <div className="col-span-12 space-y-5">
       {/* Header */}
       <div className="flex items-center gap-3">
         <div className="flex items-center gap-2">
