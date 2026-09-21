@@ -773,7 +773,7 @@ function CompletionSection() {
   ];
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="col-span-12 flex flex-col gap-5">
       <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
         className="rounded-[18px] border p-6 bg-white relative overflow-hidden" style={{ borderColor: "#D6E3CE", boxShadow: "0 1px 3px rgba(0,0,0,.04)" }}>
         <div className="absolute top-0 left-0 w-full h-1" style={{ background: "linear-gradient(90deg, #244B35, #DCE6D0)" }} />

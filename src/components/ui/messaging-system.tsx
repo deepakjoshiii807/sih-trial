@@ -86,7 +86,7 @@ export function MessagingSystem() {
   };
 
   return (
-    <div className="border rounded-xl overflow-hidden flex" style={{ borderColor: "#E6E3D7", height: "480px" }}>
+    <div className="col-span-12 border rounded-xl overflow-hidden flex" style={{ borderColor: "#E6E3D7", height: "480px" }}>
       {/* Conversation list */}
       <div className="w-72 border-r flex flex-col" style={{ borderColor: "#E6E3D7", background: "#FAFAF7" }}>
         <div className="p-3 border-b" style={{ borderColor: "#E6E3D7" }}>
