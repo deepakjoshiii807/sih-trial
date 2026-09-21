@@ -157,6 +157,7 @@ export function SmartMatchScore({ opportunityTitle }: { opportunityTitle?: strin
     () => DEMO_CANDIDATES.filter(c => selectedForCompare.has(c.candidateId)),
     [selectedForCompare]
   );
+  const canCompare = compareCandidates.length >= 2;
 
   const distributionData = filteredCandidates.map(c => ({
     name: c.name.split(" ")[0], score: c.overallScore, skill: c.skillMatch, experience: c.experienceMatch,
@@ -177,6 +178,10 @@ export function SmartMatchScore({ opportunityTitle }: { opportunityTitle?: strin
       return next;
     });
   };
+
+  const avgScore = Math.round(DEMO_CANDIDATES.reduce((s, c) => s + c.overallScore, 0) / DEMO_CANDIDATES.length);
+  const strongFits = DEMO_CANDIDATES.filter(c => c.overallScore >= 85).length;
+  const totalMatched = DEMO_CANDIDATES.reduce((s, c) => s + c.matchedSkills.length, 0);
 
   const handleShortlist = (name: string) => { toast.success(`${name} shortlisted!`); };
   const handleReject = (name: string) => { toast.info(`${name} removed from consideration.`); };
@@ -215,15 +220,15 @@ export function SmartMatchScore({ opportunityTitle }: { opportunityTitle?: strin
           <div className="text-[10px] font-semibold uppercase tracking-wide mt-0.5" style={{ color: "#9A9D94" }}>Candidates</div>
         </div>
         <div className="text-center p-3 rounded-xl" style={{ background: "#F7F6F0" }}>
-          <div className="font-bold text-2xl" style={{ color: "#C98B5F" }}>{Math.round(DEMO_CANDIDATES.reduce((s, c) => s + c.overallScore, 0) / DEMO_CANDIDATES.length)}</div>
+          <div className="font-bold text-2xl" style={{ color: "#C98B5F" }}>{avgScore}</div>
           <div className="text-[10px] font-semibold uppercase tracking-wide mt-0.5" style={{ color: "#9A9D94" }}>Avg Score</div>
         </div>
         <div className="text-center p-3 rounded-xl" style={{ background: "#F7F6F0" }}>
-          <div className="font-bold text-2xl" style={{ color: "#244B35" }}>{DEMO_CANDIDATES.filter(c => c.overallScore >= 85).length}</div>
+          <div className="font-bold text-2xl" style={{ color: "#244B35" }}>{strongFits}</div>
           <div className="text-[10px] font-semibold uppercase tracking-wide mt-0.5" style={{ color: "#9A9D94" }}>Strong Fits</div>
         </div>
         <div className="text-center p-3 rounded-xl" style={{ background: "#F7F6F0" }}>
-          <div className="font-bold text-2xl" style={{ color: "#8A6FB8" }}>{DEMO_CANDIDATES.reduce((s, c) => s + c.matchedSkills.length, 0)}</div>
+          <div className="font-bold text-2xl" style={{ color: "#8A6FB8" }}>{totalMatched}</div>
           <div className="text-[10px] font-semibold uppercase tracking-wide mt-0.5" style={{ color: "#9A9D94" }}>Skill Matches</div>
         </div>
       </div>
@@ -289,7 +294,7 @@ export function SmartMatchScore({ opportunityTitle }: { opportunityTitle?: strin
       </div>
 
       {/* Compare panel */}
-      {compareMode && compareCandidates.length >= 2 && (
+      {compareMode && canCompare && (
         <div className="border-2 rounded-xl p-5" style={{ borderColor: "#244B35", background: "#FAFDF8" }}>
           <h4 className="text-[13px] font-bold mb-4 flex items-center gap-1.5" style={{ color: "#244B35" }}>
             <GitCompare size={14} /> Side-by-Side Comparison
@@ -384,7 +389,7 @@ export function SmartMatchScore({ opportunityTitle }: { opportunityTitle?: strin
                     <span className="px-1.5 py-0.5 rounded text-[9px] font-bold" style={{ background: statusCfg.bg, color: statusCfg.color }}>
                       {statusCfg.label}
                     </span>
-                    {c.overallScore >= 90 && (
+                    {c.overallScore > 89 && (
                       <span className="px-1.5 py-0.5 rounded text-[9px] font-bold flex items-center gap-0.5" style={{ background: "#E8D36B", color: "#5c4a08" }}>
                         <Star size={8} fill="#5c4a08" /> Top Pick
                       </span>
